@@ -27,7 +27,33 @@ t_TIMES   = r'\*'
 t_DIVIDE  = r'/'
 t_LPAREN  = r'\('
 t_RPAREN  = r'\)'
- 
+
+
+# Identifies WORD tokens and validates them according to their field in the record.
+def t_WORD(t):
+    r'[A-Za-z_][A-Za-z0-9_]*'
+    if t.lexer.field == 0:
+        t.lexer.field = 1
+        if t.value != 'TABLE_DUMP2':
+            print("Invalid record type '%s'" % t.value)
+            t.lexer.has_errors = True
+            return None
+        t.type = 'RECORD_TYPE'
+        return t
+
+    if t.lexer.field == 3:
+        if t.value not in ('B', 'A', 'W'):
+            print("Invalid state '%s'" % t.value)
+            t.lexer.has_errors = True
+            return None
+        t.type = 'STATE'
+        return t
+
+    print("Unexpected word '%s'" % t.value)
+    t.lexer.has_errors = True
+    return None
+
+
 # A regular expression rule with some action code
 def t_NUMBER(t):
      r'\d+'
