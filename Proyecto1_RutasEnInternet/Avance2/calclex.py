@@ -8,13 +8,16 @@ import ply.lex as lex
  
 # List of token names.   This is always required
 tokens = (
+    'RECORD_TYPE',
+    'PIPE',
+    'STATE',
+    'IPADDR',
+    'SLASH',
+    'TIMESTAMP',
+    'PEER_AS',
+    'MASK',
+    'AS_PATH_NUM',
     'NUMBER',
-    'PLUS',
-    'MINUS',
-    'TIMES',
-    'DIVIDE',
-    'LPAREN',
-    'RPAREN',
 )
  
 # Regular expression rules for simple tokens
