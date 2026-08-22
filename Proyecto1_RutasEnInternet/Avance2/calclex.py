@@ -53,6 +53,11 @@ def t_WORD(t):
     t.lexer.has_errors = True
     return None
 
+# Recognizes pipe separators and advances to the next field.
+def t_PIPE(t):
+    r'\|'
+    t.lexer.field += 1
+    return t
 
 # A regular expression rule with some action code
 def t_NUMBER(t):
