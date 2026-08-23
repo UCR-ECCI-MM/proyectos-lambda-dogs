@@ -5,6 +5,7 @@
  # numbers and +,-,*,/
  # ------------------------------------------------------------
 import ply.lex as lex
+import re
  
 # List of token names.   This is always required
 tokens = (
@@ -17,81 +18,141 @@ tokens = (
     'PEER_AS',
     'MASK',
     'AS_PATH_NUM',
-    'NUMBER',
 )
 
-# Recognizes dotted-quad IP addresses, currently used to validate the
-# Peer IP (field 4)
-def t_IPADDR(t):
-    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
-    if t.lexer.field != 4:
-        print("Unexpected IP address '%s'" % t.value)
+# Regular expression rules for simple tokens
+# Made this this way to have an easy way to change the regexes if needed
+RECORD_TYPE_RE = re.compile(r'^TABLE_DUMP2$')
+STATE_RE = re.compile(r'^[BAW]$')
+UINT32_RE = re.compile(
+    r'^(0|[1-9]\d{0,8}|[1-3]\d{9}|4('
+    r'[01]\d{8}|2[0-8]\d{7}|29[0-3]\d{6}|294[0-8]\d{5}|2949[0-5]\d{4}|'
+    r'29496[0-6]\d{3}|294967[01]\d{2}|2949672[0-8]\d|29496729[0-5]))$'
+)
+OCTET_RE = r'(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'
+MASK_RE = r'(3[0-2]|[12]?\d)'
+IPADDR_RE = re.compile(
+    r'' +
+    OCTET_RE + r'\.' +
+    OCTET_RE + r'\.' +
+    OCTET_RE + r'\.' +
+    OCTET_RE +
+    r'(/' + MASK_RE + r')?'
+)
+
+def is_valid_record_type(text):
+    return bool(RECORD_TYPE_RE.match(text))
+
+
+def is_valid_state(text):
+    return bool(STATE_RE.match(text))
+
+
+def is_valid_timestamp(text):
+    return bool(UINT32_RE.match(text))
+
+
+def is_valid_peer_as(text):
+    return bool(UINT32_RE.match(text))
+
+
+def is_valid_mask(text):
+    return bool(MASK_RE.match(text))
+
+
+def is_valid_as_path_num(text):
+    return bool(UINT32_RE.match(text))
+
+
+def is_valid_ipaddr(text):
+    return bool(IPADDR_RE.match(text))
+
+
+def t_INITIAL_RECORD_TYPE(t):
+    r'[A-Za-z_][A-Za-z0-9_]*'
+    if not is_valid_record_type(t.value):
+        print("Invalid record type '%s'" % t.value)
         t.lexer.has_errors = True
         return None
     return t
- 
-# Recognizes the slash that separates the IP address from the mask length
+
+
+def t_STATE(t):
+    r'[A-Za-z]+'
+    if not is_valid_state(t.value):
+        print("Invalid state '%s'" % t.value)
+        t.lexer.has_errors = True
+        return None
+    return t
+
+
+def t_IPADDR(t):
+    r'\d+\.\d+\.\d+\.\d+'
+    if not is_valid_ipaddr(t.value):
+        print("Invalid IP address '%s'" % t.value)
+        t.lexer.has_errors = True
+        return None
+    return t
+
+
 def t_SLASH(t):
     r'/'
-    t.lexer.after_slash = True
+    t.lexer.begin('mask')
     return t
 
 
-# Identifies WORD tokens and validates them according to their field in the record.
-def t_WORD(t):
-    r'[A-Za-z_][A-Za-z0-9_]*'
-    if t.lexer.field == 0:
-        t.lexer.field = 1
-        if t.value != 'TABLE_DUMP2':
-            print("Invalid record type '%s'" % t.value)
-            t.lexer.has_errors = True
-            return None
-        t.type = 'RECORD_TYPE'
-        return t
-
-    if t.lexer.field == 3:
-        if t.value not in ('B', 'A', 'W'):
-            print("Invalid state '%s'" % t.value)
-            t.lexer.has_errors = True
-            return None
-        t.type = 'STATE'
-        return t
-
-    print("Unexpected word '%s'" % t.value)
-    t.lexer.has_errors = True
-    return None
-
-# Recognizes pipe separators and advances to the next field.
-def t_PIPE(t):
-    r'\|'
-    t.lexer.field += 1
-    t.lexer.after_slash = False
-    return t
-
-# A regular expression rule with some action code
-def t_NUMBER(t):
+def t_TIMESTAMP(t):
     r'\d+'
-    value = int(t.value)
-    is_mask = t.lexer.field == 6 and getattr(t.lexer, 'after_slash', False)
-    t.lexer.after_slash = False
-    t.type = 'MASK' if is_mask else 'NUMBER'
-    t.value = value
+    if not is_valid_timestamp(t.value):
+        print("Invalid timestamp '%s'" % t.value)
+        t.lexer.has_errors = True
+        return None
+    t.value = int(t.value)
     return t
- 
- # Define a rule so we can track line numbers
+
+
+def t_PEER_AS(t):
+    r'\d+'
+    if not is_valid_peer_as(t.value):
+        print("Invalid peer AS '%s'" % t.value)
+        t.lexer.has_errors = True
+        return None
+    t.value = int(t.value)
+    return t
+
+
+def t_MASK(t):
+    r'\d+'
+    if not is_valid_mask(t.value):
+        print("Invalid mask length '%s'" % t.value)
+        t.lexer.has_errors = True
+        return None
+    t.value = int(t.value)
+    return t
+
+
+def t_AS_PATH_NUM(t):
+    r'\d+'
+    if not is_valid_as_path_num(t.value):
+        print("Invalid AS number in path '%s'" % t.value)
+        t.lexer.has_errors = True
+        return None
+    t.value = int(t.value)
+    return t
+
 def t_newline(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
-    t.lexer.field = 0
-    t.lexer.after_slash = False
- 
-# A string containing ignored characters (spaces and tabs)
-t_ignore  = ' \t'
- 
-# Error handling rule
+    t.lexer.begin('INITIAL')
+
+
+t_ignore = ' \t'
+
+
 def t_error(t):
-     print("Illegal character '%s'" % t.value[0])
-     t.lexer.skip(1)
+    print("Illegal character '%s'" % t.value[0])
+    t.lexer.has_errors = True
+    t.lexer.skip(1)
  
 # Build the lexer
 lexer = lex.lex()
