@@ -20,13 +20,11 @@ tokens = (
     'NUMBER',
 )
  
-# Regular expression rules for simple tokens
-t_PLUS    = r'\+'
-t_MINUS   = r'-'
-t_TIMES   = r'\*'
-t_DIVIDE  = r'/'
-t_LPAREN  = r'\('
-t_RPAREN  = r'\)'
+# Recognizes the slash that separates the IP address from the mask length
+def t_SLASH(t):
+    r'/'
+    t.lexer.after_slash = True
+    return t
 
 
 # Identifies WORD tokens and validates them according to their field in the record.
@@ -57,18 +55,25 @@ def t_WORD(t):
 def t_PIPE(t):
     r'\|'
     t.lexer.field += 1
+    t.lexer.after_slash = False
     return t
 
 # A regular expression rule with some action code
 def t_NUMBER(t):
-     r'\d+'
-     t.value = int(t.value)    
-     return t
+    r'\d+'
+    value = int(t.value)
+    is_mask = t.lexer.field == 6 and getattr(t.lexer, 'after_slash', False)
+    t.lexer.after_slash = False
+    t.type = 'MASK' if is_mask else 'NUMBER'
+    t.value = value
+    return t
  
  # Define a rule so we can track line numbers
 def t_newline(t):
-     r'\n+'
-     t.lexer.lineno += len(t.value)
+    r'\n+'
+    t.lexer.lineno += len(t.value)
+    t.lexer.field = 0
+    t.lexer.after_slash = False
  
 # A string containing ignored characters (spaces and tabs)
 t_ignore  = ' \t'
@@ -81,12 +86,13 @@ def t_error(t):
 # Build the lexer
 lexer = lex.lex()
 
-# Test it out
-data = '''
-3 + 4 * 10
-  + -20 *2
-'''
- 
+# Test
+data = 'TABLE_DUMP2|1421996402|B|012.802.62.15|1252|1.0.128.0/17|9002 4826 38803 56203'
+
+lexer.field = 0
+lexer.after_slash = False
+lexer.has_errors = False
+
 # Give the lexer some input
 lexer.input(data)
  
