@@ -19,6 +19,16 @@ tokens = (
     'AS_PATH_NUM',
     'NUMBER',
 )
+
+# Recognizes dotted-quad IP addresses, currently used to validate the
+# Peer IP (field 4)
+def t_IPADDR(t):
+    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+    if t.lexer.field != 4:
+        print("Unexpected IP address '%s'" % t.value)
+        t.lexer.has_errors = True
+        return None
+    return t
  
 # Recognizes the slash that separates the IP address from the mask length
 def t_SLASH(t):
