@@ -42,7 +42,6 @@ def t_IPADDR(t):
 
 # Separators used between fields and between an address and its mask
 t_PIPE = r'\|'
-t_SLASH = r'/'
 
 
 # Braces and commas used when an AS path contains a group of AS numbers
@@ -54,12 +53,27 @@ t_COMMA = r','
 # Numbers used for timestamps, AS numbers, masks and AS paths
 MAX_UINT32 = 2**32 - 1  # Maximum value for a 32-bit unsigned integer
 
+def t_SLASH(t):
+    r'/'
+    t.lexer.after_slash = True
+    return t
+
+
 def t_NUMBER(t):
-    r'\d{1,10}'
+    r'\d+'
 
     value = int(t.value)
+    after_slash = getattr(t.lexer, 'after_slash', False)
+    t.lexer.after_slash = False  # el flag solo aplica al número inmediatamente después del '/'
 
-    # Check that the number fits in the allowed 32-bit range
+    if after_slash and value > 32:
+        print(
+            f"Lexical error [Line {t.lineno}]: "
+            f"Mask out of range (0-32): {value}"
+        )
+        t.lexer.has_errors = True
+        return None
+
     if value > MAX_UINT32:
         print(
             f"Lexical error [Line {t.lineno}]: "
