@@ -115,14 +115,27 @@ if __name__ == '__main__':
         data = f.read()
 
     lexer.input(data)
+    lexer.has_errors = False
 
+    collected_tokens = []
     while True:
         tok = lexer.token()
         if not tok:
             break
-        print(tok)
+        collected_tokens.append(tok)
+
+    choice = input("Mostrar tokens en (C)onsola o guardar en (A)rchivo? [C/A]: ").strip().upper()
+
+    if choice == 'A':
+        with open("Salida.txt", "w") as out_file:
+            for tok in collected_tokens:
+                out_file.write(f"{tok}\n")
+        print("Tokens guardados en Salida.txt")
+    else:
+        for tok in collected_tokens:
+            print(tok)
 
     if lexer.has_errors:
-        print("archivo MRT con tokens incorrectos")
+        print("Archivo MRT con tokens incorrectos")
     else:
-        print("archivo MRT con tokens correctos")
+        print("Archivo MRT con tokens correctos")
