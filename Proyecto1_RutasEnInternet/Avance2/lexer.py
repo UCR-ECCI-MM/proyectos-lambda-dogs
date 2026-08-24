@@ -124,18 +124,18 @@ if __name__ == '__main__':
             break
         collected_tokens.append(tok)
 
-    choice = input("Mostrar tokens en (C)onsola o guardar en (A)rchivo? [C/A]: ").strip().upper()
+    choice = input("Show tokens in (C)onsole or save them in a (F)ile? [C/F]: ").strip().upper()
 
-    if choice == 'A':
-        with open("Salida.txt", "w") as out_file:
+    if choice == 'F':
+        with open("TokenOutput.txt", "w") as out_file:
             for tok in collected_tokens:
                 out_file.write(f"{tok}\n")
-        print("Tokens guardados en Salida.txt")
+        print("Tokens saved in TokenOutput.txt")
     else:
         for tok in collected_tokens:
             print(tok)
 
     if lexer.has_errors:
-        print("Archivo MRT con tokens incorrectos")
+        print("MRT File with INCORRECT tokens")
     else:
-        print("Archivo MRT con tokens correctos")
+        print("MRT File with CORRECT tokens :)")
