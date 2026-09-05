@@ -1,0 +1,179 @@
+import sys
+import time
+import re
+import ply.lex as lex
+
+
+# List of all token types that can be recognized by the lexer
+tokens = (
+    'RECORD_TYPE',
+    'TIMESTAMP',
+    'STATE',
+    'IPADDR',
+    'PIPE',
+    'SLASH',
+    'NUMBER',
+    'LBRACE',
+    'RBRACE',
+    'COMMA',
+)
+
+# Maximum value for a 32-bit unsigned integer, used to validate both
+# the TIMESTAMP token and the NUMBER token
+MAX_UINT32 = 2**32 - 1
+
+
+# Token rules and their corresponding regular expressions
+
+# Recognizes the TABLE_DUMP2 value used at the beginning of each record
+def t_RECORD_TYPE(t):
+    r'TABLE_DUMP2\b'
+    return t
+
+
+# Recognizes the possible states of a record: B, A or W
+def t_STATE(t):
+    r'[BAW]\b'
+    return t
+
+
+# Recognizes the timestamp field, which must have exactly 10 digits
+# (unix timestamp). It must be defined before t_NUMBER so PLY gives it
+# priority over the generic NUMBER rule.
+def t_TIMESTAMP(t):
+    r'(?<!\d)\d{10}(?!\d)'
+
+    value = int(t.value)
+
+    if value > MAX_UINT32:
+        print(
+            f"Lexical error [Line {t.lineno}]: "
+            f"Timestamp out of the allowed range (32-bit uint): {value}"
+        )
+        t.lexer.has_errors = True
+        return None
+
+    t.value = value
+    return t
+
+
+# Recognizes IPv4 addresses and makes sure each octet is between 0 and 255
+OCTET = r'(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'
+
+@lex.TOKEN(r'\b(' + OCTET + r'\.){3}' + OCTET + r'\b')
+def t_IPADDR(t):
+    return t
+
+
+# Separators used between fields and between an address and its mask
+t_PIPE = r'\|'
+
+
+# Braces and commas used when an AS path contains a group of AS numbers
+t_LBRACE = r'\{'
+t_RBRACE = r'\}'
+t_COMMA = r','
+
+
+# Numbers used for AS numbers, masks and AS paths (the timestamp field
+# is handled separately by t_TIMESTAMP)
+def t_SLASH(t):
+    r'/'
+    t.lexer.after_slash = True
+    return t
+
+
+def t_NUMBER(t):
+    r'\d+'
+
+    value = int(t.value)
+    after_slash = getattr(t.lexer, 'after_slash', False)
+    t.lexer.after_slash = False  # el flag solo aplica al número inmediatamente después del '/'
+
+    if after_slash and value > 32:
+        print(
+            f"Lexical error [Line {t.lineno}]: "
+            f"Mask out of range (0-32): {value}"
+        )
+        t.lexer.has_errors = True
+        return None
+
+    if value > MAX_UINT32:
+        print(
+            f"Lexical error [Line {t.lineno}]: "
+            f"Number out of the allowed range (32-bit uint): {value}"
+        )
+        t.lexer.has_errors = True
+        return None
+
+    t.value = value
+    return t
+
+
+# Keeps track of line numbers when the lexer finds one or more newlines
+def t_newline(t):
+    r'\n+'
+    t.lexer.lineno += len(t.value)
+
+
+# Spaces, tabs and carriage returns do not need to be returned as tokens
+t_ignore = ' \t\r'
+
+
+# Handles text that does not match any of the defined token rules
+_illegal_run = re.compile(r'[^\s|/{},]+')
+
+
+def t_error(t):
+    # Try to report the whole invalid sequence instead of one character at a time
+    match = _illegal_run.match(t.value)
+    bad_lexeme = match.group(0) if match else t.value[0]
+
+    print(
+        f"Lexical error [Line {t.lineno}]: "
+        f"Illegal token '{bad_lexeme}'"
+    )
+
+    t.lexer.has_errors = True
+    t.lexer.skip(len(bad_lexeme))
+
+
+# Build the lexer using the rules defined above
+lexer = lex.lex()
+
+
+# Main program
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print("Usage: python mrtlex.py <mrt_dump_file>")
+        sys.exit(1)
+
+    input_path = sys.argv[1]
+    with open(input_path, 'r') as f:
+        data = f.read()
+
+    lexer.input(data)
+    lexer.has_errors = False
+
+    collected_tokens = []
+    while True:
+        tok = lexer.token()
+        if not tok:
+            break
+        collected_tokens.append(tok)
+
+    choice = input("Show tokens in (C)onsole or save them in a (F)ile? [C/F]: ").strip().upper()
+
+    if choice == 'F':
+        with open("TokenOutput.txt", "w") as out_file:
+            for tok in collected_tokens:
+                out_file.write(f"{tok}\n")
+        print("Tokens saved in TokenOutput.txt")
+    else:
+        for tok in collected_tokens:
+            print(tok)
+
+    if lexer.has_errors:
+        print("MRT File with INCORRECT tokens")
+    else:
+        print("MRT File with CORRECT tokens :)")
