@@ -1,11 +1,3 @@
-# -----------------------------------------------------------------------------
-# calc.py
-#
-# A simple calculator with variables -- all in one file.
-# -----------------------------------------------------------------------------
-
-# The lexer and token list are defined in lexer.py.
-# We just import them here instead of defining them again.
 import sys
 from lexer import tokens, lexer
 
@@ -14,6 +6,20 @@ start = 'linea_inicio'
 
 def p_linea_inicio(p):
     'linea_inicio : RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR'
+    pass
+
+# Fields 5 and 6
+def p_prefijo(p):
+    'prefijo : IPADDR SLASH NUMBER'
+    mascara = p[3]
+    if not (1 <= mascara <= 31):
+        print(
+            f"Syntax error [Line {p.lineno(1)}]: "
+            f"prefix length out of range (1-31): {mascara}"
+        )
+
+def p_linea_parcial(p):
+    'linea_parcial : linea_inicio PIPE NUMBER PIPE prefijo'
     pass
 
 def p_error(p):
@@ -28,7 +34,7 @@ parser = yacc.yacc()
 if __name__ == '__main__':
     while True:
         try:
-            s = input('mrt-p1 > ')
+            s = input('mrt-p2 > ')
         except EOFError:
             break
         if not s:
