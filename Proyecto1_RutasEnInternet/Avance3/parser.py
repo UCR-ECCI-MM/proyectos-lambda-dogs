@@ -155,6 +155,18 @@ def p_archivo_single(p):
     'archivo : linea'
     p[0] = [p[1]]
 
+def p_linea(p):
+    ('linea : RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE '
+     'NUMBER PIPE prefix PIPE as_path')
+    p[0] = {
+        'record_type': p[1],
+        'timestamp': p[3],
+        'state': p[5],
+        'peer_ip': p[7],
+        'peer_as': p[9],
+        'prefix': p[11],
+        'as_path': p[13],
+    }
 
 FIELD_NAMES = [
     'RECORD_TYPE',
@@ -165,7 +177,6 @@ FIELD_NAMES = [
     'PREFIX (IPADDR/MASK)',
     'AS_PATH',
 ]
-
 
 class FieldTrackingLexer:
     """Wraps the real lexer to track the current field of the LINEA
@@ -195,7 +206,6 @@ class FieldTrackingLexer:
 
     def __getattr__(self, name):
         return getattr(self.base_lexer, name)
-
 
 def p_error(p):
     field = tracking_lexer.field_name()
