@@ -167,6 +167,10 @@ def p_linea(p):
         'as_path': p[13],
     }
 
+def p_prefix(p):
+    'prefix : IPADDR SLASH NUMBER'
+    p[0] = (p[1], p[3])
+
 def p_as_path_multiple(p):
     'as_path : as_element as_path'
     p[0] = [p[1]] + p[2]
