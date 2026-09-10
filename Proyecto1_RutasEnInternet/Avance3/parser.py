@@ -171,7 +171,6 @@ def p_as_path_multiple(p):
     'as_path : as_element as_path'
     p[0] = [p[1]] + p[2]
 
-
 def p_as_path_single(p):
     'as_path : as_element'
     p[0] = [p[1]]
