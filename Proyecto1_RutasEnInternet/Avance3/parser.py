@@ -217,7 +217,6 @@ class FieldTrackingLexer:
 
     def __getattr__(self, name):
         return getattr(self.base_lexer, name)
->>>>>>> 88919c1a45bcc9b07a047942a682ab306ea6e718
 
 def p_error(p):
     if p is not None:
