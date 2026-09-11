@@ -155,58 +155,24 @@ def p_archivo_single(p):
     'archivo : linea'
     p[0] = [p[1]]
 
-
-FIELD_NAMES = [
-    'RECORD_TYPE',
-    'TIMESTAMP',
-    'STATE',
-    'IPADDR (peer)',
-    'PEER_AS',
-    'PREFIX (IPADDR/MASK)',
-    'AS_PATH',
-]
+def p_as_element_num(p):
+    'as_element : NUMBER'
+    p[0] = p[1]
 
 
-class FieldTrackingLexer:
-    """Wraps the real lexer to track the current field of the LINEA
-    being parsed, without changing anything about how it tokenizes."""
-
-    def __init__(self, base_lexer):
-        self.base_lexer = base_lexer
-        self.field_index = 0
-
-    def input(self, data):
-        self.field_index = 0
-        return self.base_lexer.input(data)
-
-    def token(self):
-        tok = self.base_lexer.token()
-        if tok is None:
-            return None
-        if tok.type == 'RECORD_TYPE':
-            self.field_index = 0
-        elif tok.type == 'PIPE':
-            self.field_index += 1
-        return tok
-
-    def field_name(self):
-        index = min(self.field_index, len(FIELD_NAMES) - 1)
-        return FIELD_NAMES[index]
-
-    def __getattr__(self, name):
-        return getattr(self.base_lexer, name)
-
+def p_as_element_set(p):
+    'as_element : as_set'
+    p[0] = p[1]
 
 def p_error(p):
-    field = tracking_lexer.field_name()
     if p is not None:
         print(
-            f"Syntax error [Line {p.lineno}]: invalid value for field "
-            f"{field}: '{p.value}'"
+            f"Syntax error [Line {p.lineno}]: "
+            f"invalid token '{p.value}'"
         )
     else:
-        print(f"Syntax error: unexpected end of input in field {field}")
-    parser.has_errors = True
+        print("Syntax error: unexpected end of input")
 
+    parser.has_errors = True
 
 parser = yacc.yacc()

@@ -1,0 +1,305 @@
+Created by PLY version 3.11 (http://www.dabeaz.com/ply)
+
+Grammar
+
+Rule 0     S' -> archivo
+Rule 1     archivo -> linea archivo
+Rule 2     archivo -> linea
+Rule 3     linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+Rule 4     prefix -> IPADDR SLASH NUMBER
+Rule 5     as_path -> as_element as_path
+Rule 6     as_path -> as_element
+Rule 7     as_element -> NUMBER
+Rule 8     as_element -> as_set
+Rule 9     as_set -> LBRACE as_set_list RBRACE
+Rule 10    as_set_list -> NUMBER COMMA as_set_list
+Rule 11    as_set_list -> NUMBER
+
+Terminals, with rules where they appear
+
+COMMA                : 10
+IPADDR               : 3 4
+LBRACE               : 9
+NUMBER               : 3 4 7 10 11
+PIPE                 : 3 3 3 3 3 3
+RBRACE               : 9
+RECORD_TYPE          : 3
+SLASH                : 4
+STATE                : 3
+TIMESTAMP            : 3
+error                : 
+
+Nonterminals, with rules where they appear
+
+archivo              : 1 0
+as_element           : 5 6
+as_path              : 3 5
+as_set               : 8
+as_set_list          : 9 10
+linea                : 1 2
+prefix               : 3
+
+Parsing method: LALR
+
+state 0
+
+    (0) S' -> . archivo
+    (1) archivo -> . linea archivo
+    (2) archivo -> . linea
+    (3) linea -> . RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+
+    RECORD_TYPE     shift and go to state 3
+
+    archivo                        shift and go to state 1
+    linea                          shift and go to state 2
+
+state 1
+
+    (0) S' -> archivo .
+
+
+
+state 2
+
+    (1) archivo -> linea . archivo
+    (2) archivo -> linea .
+    (1) archivo -> . linea archivo
+    (2) archivo -> . linea
+    (3) linea -> . RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+
+    $end            reduce using rule 2 (archivo -> linea .)
+    RECORD_TYPE     shift and go to state 3
+
+    linea                          shift and go to state 2
+    archivo                        shift and go to state 4
+
+state 3
+
+    (3) linea -> RECORD_TYPE . PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+
+    PIPE            shift and go to state 5
+
+
+state 4
+
+    (1) archivo -> linea archivo .
+
+    $end            reduce using rule 1 (archivo -> linea archivo .)
+
+
+state 5
+
+    (3) linea -> RECORD_TYPE PIPE . TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+
+    TIMESTAMP       shift and go to state 6
+
+
+state 6
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP . PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+
+    PIPE            shift and go to state 7
+
+
+state 7
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE . STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+
+    STATE           shift and go to state 8
+
+
+state 8
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE . PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+
+    PIPE            shift and go to state 9
+
+
+state 9
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE . IPADDR PIPE NUMBER PIPE prefix PIPE as_path
+
+    IPADDR          shift and go to state 10
+
+
+state 10
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR . PIPE NUMBER PIPE prefix PIPE as_path
+
+    PIPE            shift and go to state 11
+
+
+state 11
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE . NUMBER PIPE prefix PIPE as_path
+
+    NUMBER          shift and go to state 12
+
+
+state 12
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER . PIPE prefix PIPE as_path
+
+    PIPE            shift and go to state 13
+
+
+state 13
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE . prefix PIPE as_path
+    (4) prefix -> . IPADDR SLASH NUMBER
+
+    IPADDR          shift and go to state 14
+
+    prefix                         shift and go to state 15
+
+state 14
+
+    (4) prefix -> IPADDR . SLASH NUMBER
+
+    SLASH           shift and go to state 16
+
+
+state 15
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix . PIPE as_path
+
+    PIPE            shift and go to state 17
+
+
+state 16
+
+    (4) prefix -> IPADDR SLASH . NUMBER
+
+    NUMBER          shift and go to state 18
+
+
+state 17
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE . as_path
+    (5) as_path -> . as_element as_path
+    (6) as_path -> . as_element
+    (7) as_element -> . NUMBER
+    (8) as_element -> . as_set
+    (9) as_set -> . LBRACE as_set_list RBRACE
+
+    NUMBER          shift and go to state 19
+    LBRACE          shift and go to state 23
+
+    as_path                        shift and go to state 20
+    as_element                     shift and go to state 21
+    as_set                         shift and go to state 22
+
+state 18
+
+    (4) prefix -> IPADDR SLASH NUMBER .
+
+    PIPE            reduce using rule 4 (prefix -> IPADDR SLASH NUMBER .)
+
+
+state 19
+
+    (7) as_element -> NUMBER .
+
+    NUMBER          reduce using rule 7 (as_element -> NUMBER .)
+    LBRACE          reduce using rule 7 (as_element -> NUMBER .)
+    RECORD_TYPE     reduce using rule 7 (as_element -> NUMBER .)
+    $end            reduce using rule 7 (as_element -> NUMBER .)
+
+
+state 20
+
+    (3) linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path .
+
+    RECORD_TYPE     reduce using rule 3 (linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path .)
+    $end            reduce using rule 3 (linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path .)
+
+
+state 21
+
+    (5) as_path -> as_element . as_path
+    (6) as_path -> as_element .
+    (5) as_path -> . as_element as_path
+    (6) as_path -> . as_element
+    (7) as_element -> . NUMBER
+    (8) as_element -> . as_set
+    (9) as_set -> . LBRACE as_set_list RBRACE
+
+    RECORD_TYPE     reduce using rule 6 (as_path -> as_element .)
+    $end            reduce using rule 6 (as_path -> as_element .)
+    NUMBER          shift and go to state 19
+    LBRACE          shift and go to state 23
+
+    as_element                     shift and go to state 21
+    as_path                        shift and go to state 24
+    as_set                         shift and go to state 22
+
+state 22
+
+    (8) as_element -> as_set .
+
+    NUMBER          reduce using rule 8 (as_element -> as_set .)
+    LBRACE          reduce using rule 8 (as_element -> as_set .)
+    RECORD_TYPE     reduce using rule 8 (as_element -> as_set .)
+    $end            reduce using rule 8 (as_element -> as_set .)
+
+
+state 23
+
+    (9) as_set -> LBRACE . as_set_list RBRACE
+    (10) as_set_list -> . NUMBER COMMA as_set_list
+    (11) as_set_list -> . NUMBER
+
+    NUMBER          shift and go to state 26
+
+    as_set_list                    shift and go to state 25
+
+state 24
+
+    (5) as_path -> as_element as_path .
+
+    RECORD_TYPE     reduce using rule 5 (as_path -> as_element as_path .)
+    $end            reduce using rule 5 (as_path -> as_element as_path .)
+
+
+state 25
+
+    (9) as_set -> LBRACE as_set_list . RBRACE
+
+    RBRACE          shift and go to state 27
+
+
+state 26
+
+    (10) as_set_list -> NUMBER . COMMA as_set_list
+    (11) as_set_list -> NUMBER .
+
+    COMMA           shift and go to state 28
+    RBRACE          reduce using rule 11 (as_set_list -> NUMBER .)
+
+
+state 27
+
+    (9) as_set -> LBRACE as_set_list RBRACE .
+
+    NUMBER          reduce using rule 9 (as_set -> LBRACE as_set_list RBRACE .)
+    LBRACE          reduce using rule 9 (as_set -> LBRACE as_set_list RBRACE .)
+    RECORD_TYPE     reduce using rule 9 (as_set -> LBRACE as_set_list RBRACE .)
+    $end            reduce using rule 9 (as_set -> LBRACE as_set_list RBRACE .)
+
+
+state 28
+
+    (10) as_set_list -> NUMBER COMMA . as_set_list
+    (10) as_set_list -> . NUMBER COMMA as_set_list
+    (11) as_set_list -> . NUMBER
+
+    NUMBER          shift and go to state 26
+
+    as_set_list                    shift and go to state 29
+
+state 29
+
+    (10) as_set_list -> NUMBER COMMA as_set_list .
+
+    RBRACE          reduce using rule 10 (as_set_list -> NUMBER COMMA as_set_list .)
+
