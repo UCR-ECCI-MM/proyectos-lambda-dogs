@@ -150,19 +150,74 @@ def p_archivo_multiple(p):
     'archivo : linea archivo'
     p[0] = [p[1]] + p[2]
 
-
 def p_archivo_single(p):
     'archivo : linea'
     p[0] = [p[1]]
 
-def p_as_element_num(p):
-    'as_element : NUMBER'
-    p[0] = p[1]
+def p_linea(p):
+    ('linea : RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE '
+     'NUMBER PIPE prefix PIPE as_path')
+    p[0] = {
+        'record_type': p[1],
+        'timestamp': p[3],
+        'state': p[5],
+        'peer_ip': p[7],
+        'peer_as': p[9],
+        'prefix': p[11],
+        'as_path': p[13],
+    }
 
+def p_prefix(p):
+    'prefix : IPADDR SLASH NUMBER'
+    p[0] = (p[1], p[3])
 
-def p_as_element_set(p):
-    'as_element : as_set'
-    p[0] = p[1]
+def p_as_path_multiple(p):
+    'as_path : as_element as_path'
+    p[0] = [p[1]] + p[2]
+
+def p_as_path_single(p):
+    'as_path : as_element'
+    p[0] = [p[1]]
+
+FIELD_NAMES = [
+    'RECORD_TYPE',
+    'TIMESTAMP',
+    'STATE',
+    'IPADDR (peer)',
+    'PEER_AS',
+    'PREFIX (IPADDR/MASK)',
+    'AS_PATH',
+]
+
+class FieldTrackingLexer:
+    """Wraps the real lexer to track the current field of the LINEA
+    being parsed, without changing anything about how it tokenizes."""
+
+    def __init__(self, base_lexer):
+        self.base_lexer = base_lexer
+        self.field_index = 0
+
+    def input(self, data):
+        self.field_index = 0
+        return self.base_lexer.input(data)
+
+    def token(self):
+        tok = self.base_lexer.token()
+        if tok is None:
+            return None
+        if tok.type == 'RECORD_TYPE':
+            self.field_index = 0
+        elif tok.type == 'PIPE':
+            self.field_index += 1
+        return tok
+
+    def field_name(self):
+        index = min(self.field_index, len(FIELD_NAMES) - 1)
+        return FIELD_NAMES[index]
+
+    def __getattr__(self, name):
+        return getattr(self.base_lexer, name)
+>>>>>>> 88919c1a45bcc9b07a047942a682ab306ea6e718
 
 def p_error(p):
     if p is not None:
