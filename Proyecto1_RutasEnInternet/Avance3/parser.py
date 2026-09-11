@@ -179,10 +179,13 @@ def p_as_path_single(p):
     'as_path : as_element'
     p[0] = [p[1]]
 
+def p_as_set(p):
+    'as_set : LBRACE as_set_list RBRACE'
+    p[0] = set(p[2])
+
 def p_as_set_list_multiple(p):
     'as_set_list : NUMBER COMMA as_set_list'
     p[0] = [p[1]] + p[3]
-
 
 def p_as_set_list_single(p):
     'as_set_list : NUMBER'
