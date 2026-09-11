@@ -150,7 +150,6 @@ def p_archivo_multiple(p):
     'archivo : linea archivo'
     p[0] = [p[1]] + p[2]
 
-
 def p_archivo_single(p):
     'archivo : linea'
     p[0] = [p[1]]
@@ -167,6 +166,14 @@ def p_linea(p):
         'prefix': p[11],
         'as_path': p[13],
     }
+
+def p_as_path_multiple(p):
+    'as_path : as_element as_path'
+    p[0] = [p[1]] + p[2]
+
+def p_as_path_single(p):
+    'as_path : as_element'
+    p[0] = [p[1]]
 
 FIELD_NAMES = [
     'RECORD_TYPE',
