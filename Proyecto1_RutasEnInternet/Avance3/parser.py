@@ -179,6 +179,10 @@ def p_as_path_single(p):
     'as_path : as_element'
     p[0] = [p[1]]
 
+def p_as_element_num(p):
+    'as_element : NUMBER'
+    p[0] = p[1]
+
 def p_as_set(p):
     'as_set : LBRACE as_set_list RBRACE'
     p[0] = set(p[2])
@@ -203,3 +207,46 @@ def p_error(p):
     parser.has_errors = True
 
 parser = yacc.yacc()
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print("Usage: python mrtparser.py <mrt_dump_file>")
+        sys.exit(1)
+
+    input_path = sys.argv[1]
+    with open(input_path, 'r') as f:
+        data = f.read()
+
+    lexer.lineno = 1
+    lexer.has_errors = False
+    lexer.input(data)
+
+    print("=== Tokens ===")
+    while True:
+        tok = lexer.token()
+        if not tok:
+            break
+        print(tok)
+
+    if lexer.has_errors:
+        print("MRT File with INCORRECT tokens")
+    else:
+        print("MRT File with CORRECT tokens :)")
+
+    lexer.lineno = 1
+    lexer.has_errors = False
+    parser.has_errors = False
+
+    print("\n=== Parse ===")
+    result = parser.parse(data, lexer=lexer, tracking=True)
+
+    if lexer.has_errors or parser.has_errors:
+        print("MRT File with INCORRECT syntax")
+    else:
+        for record in result:
+            print(record)
+        print("MRT File with CORRECT syntax :)")
