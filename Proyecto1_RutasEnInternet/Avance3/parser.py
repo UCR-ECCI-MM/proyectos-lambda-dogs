@@ -183,6 +183,10 @@ def p_as_element_num(p):
     'as_element : NUMBER'
     p[0] = p[1]
 
+def p_as_element_set(p):
+    'as_element : as_set'
+    p[0] = p[1]
+
 def p_as_set(p):
     'as_set : LBRACE as_set_list RBRACE'
     p[0] = set(p[2])
@@ -197,10 +201,7 @@ def p_as_set_list_single(p):
 
 def p_error(p):
     if p is not None:
-        print(
-            f"Syntax error [Line {p.lineno}]: "
-            f"invalid token '{p.value}'"
-        )
+        print(f"Syntax error [Line {p.lineno}]")
     else:
         print("Syntax error: unexpected end of input")
 
@@ -218,6 +219,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     input_path = sys.argv[1]
+
     with open(input_path, 'r') as f:
         data = f.read()
 
@@ -225,28 +227,66 @@ if __name__ == '__main__':
     lexer.has_errors = False
     lexer.input(data)
 
-    print("=== Tokens ===")
+    collected_tokens = []
+
     while True:
         tok = lexer.token()
         if not tok:
             break
-        print(tok)
+        collected_tokens.append(tok)
 
-    if lexer.has_errors:
-        print("MRT File with INCORRECT tokens")
-    else:
-        print("MRT File with CORRECT tokens :)")
+    choice = input(
+        "Show results in (C)onsole or save them in a (F)ile? [C/F]: "
+    ).strip().upper()
 
     lexer.lineno = 1
     lexer.has_errors = False
     parser.has_errors = False
 
-    print("\n=== Parse ===")
     result = parser.parse(data, lexer=lexer, tracking=True)
 
-    if lexer.has_errors or parser.has_errors:
-        print("MRT File with INCORRECT syntax")
+    if choice == 'F':
+        with open("ParserOutput.txt", "w") as out_file:
+
+            out_file.write("=== Tokens ===\n")
+
+            for tok in collected_tokens:
+                out_file.write(f"{tok}\n")
+
+            if lexer.has_errors:
+                out_file.write("MRT File with INCORRECT tokens\n")
+            else:
+                out_file.write("MRT File with CORRECT tokens :)\n")
+
+            out_file.write("\n=== Parse ===\n")
+
+            if lexer.has_errors or parser.has_errors:
+                out_file.write("MRT File with INCORRECT syntax\n")
+            else:
+                for record in result:
+                    out_file.write(f"{record}\n")
+
+                out_file.write("MRT File with CORRECT syntax :)\n")
+
+        print("Results saved in ParserOutput.txt")
+
     else:
-        for record in result:
-            print(record)
-        print("MRT File with CORRECT syntax :)")
+        print("=== Tokens ===")
+
+        for tok in collected_tokens:
+            print(tok)
+
+        if lexer.has_errors:
+            print("MRT File with INCORRECT tokens")
+        else:
+            print("MRT File with CORRECT tokens :)")
+
+        print("\n=== Parse ===")
+
+        if lexer.has_errors or parser.has_errors:
+            print("MRT File with INCORRECT syntax")
+        else:
+            for record in result:
+                print(record)
+
+            print("MRT File with CORRECT syntax :)")

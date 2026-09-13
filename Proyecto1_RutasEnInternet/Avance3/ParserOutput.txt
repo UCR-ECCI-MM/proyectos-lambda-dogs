@@ -1,0 +1,25 @@
+=== Tokens ===
+LexToken(RECORD_TYPE,'TABLE_DUMP2',1,0)
+LexToken(PIPE,'|',1,11)
+LexToken(TIMESTAMP,1785888000,1,12)
+LexToken(PIPE,'|',1,22)
+LexToken(STATE,'B',1,23)
+LexToken(PIPE,'|',1,24)
+LexToken(IPADDR,'186.211.128.34',1,25)
+LexToken(PIPE,'|',1,39)
+LexToken(NUMBER,14840,1,40)
+LexToken(PIPE,'|',1,45)
+LexToken(IPADDR,'37.52.0.0',1,46)
+LexToken(SLASH,'/',1,55)
+LexToken(NUMBER,14,1,56)
+LexToken(PIPE,'|',1,58)
+LexToken(NUMBER,14840,1,59)
+LexToken(NUMBER,6849,1,65)
+LexToken(LBRACE,'{',1,70)
+LexToken(NUMBER,6877,1,71)
+LexToken(RBRACE,'}',1,75)
+MRT File with CORRECT tokens :)
+
+=== Parse ===
+{'record_type': 'TABLE_DUMP2', 'timestamp': 1785888000, 'state': 'B', 'peer_ip': '186.211.128.34', 'peer_as': 14840, 'prefix': ('37.52.0.0', 14), 'as_path': [14840, 6849, {6877}]}
+MRT File with CORRECT syntax :)
