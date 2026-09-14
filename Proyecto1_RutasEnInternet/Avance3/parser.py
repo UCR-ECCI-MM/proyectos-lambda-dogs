@@ -148,40 +148,43 @@ lexer = lex.lex()
 
 def p_archivo_multiple(p):
     'archivo : linea archivo'
-    p[0] = [p[1]] + p[2]
+    p[0] = None
 
 def p_archivo_single(p):
     'archivo : linea'
-    p[0] = [p[1]]
+    p[0] = None
 
 def p_linea(p):
     ('linea : RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE '
      'NUMBER PIPE prefix PIPE as_path')
-    p[0] = {
-        'record_type': p[1],
-        'timestamp': p[3],
-        'state': p[5],
-        'peer_ip': p[7],
-        'peer_as': p[9],
-        'prefix': p[11],
-        'as_path': p[13],
-    }
+
+    peer_as = p[9]
+    as_numbers = p[13]
+
+    if peer_as not in as_numbers:
+        print(
+            f"Semantic error [Line {p.lineno(1)}]: "
+            f"PEER_AS ({peer_as}) does not appear in AS_PATH {sorted(as_numbers)}"
+        )
+        parser.has_errors = True
+
+    p[0] = None
 
 def p_prefix(p):
     'prefix : IPADDR SLASH NUMBER'
-    p[0] = (p[1], p[3])
+    p[0] = None
 
 def p_as_path_multiple(p):
     'as_path : as_element as_path'
-    p[0] = [p[1]] + p[2]
+    p[0] = p[1] + p[2]
 
 def p_as_path_single(p):
     'as_path : as_element'
-    p[0] = [p[1]]
+    p[0] = p[1]
 
 def p_as_element_num(p):
     'as_element : NUMBER'
-    p[0] = p[1]
+    p[0] = [p[1]]
 
 def p_as_element_set(p):
     'as_element : as_set'
@@ -189,7 +192,7 @@ def p_as_element_set(p):
 
 def p_as_set(p):
     'as_set : LBRACE as_set_list RBRACE'
-    p[0] = set(p[2])
+    p[0] = p[2]
 
 def p_as_set_list_multiple(p):
     'as_set_list : NUMBER COMMA as_set_list'
@@ -243,8 +246,7 @@ if __name__ == '__main__':
     lexer.has_errors = False
     parser.has_errors = False
 
-    result = parser.parse(data, lexer=lexer, tracking=True)
-
+    parser.parse(data, lexer=lexer, tracking=True)
     if choice == 'F':
         with open("ParserOutput.txt", "w") as out_file:
 
@@ -263,9 +265,6 @@ if __name__ == '__main__':
             if lexer.has_errors or parser.has_errors:
                 out_file.write("MRT File with INCORRECT syntax\n")
             else:
-                for record in result:
-                    out_file.write(f"{record}\n")
-
                 out_file.write("MRT File with CORRECT syntax :)\n")
 
         print("Results saved in ParserOutput.txt")
@@ -286,7 +285,4 @@ if __name__ == '__main__':
         if lexer.has_errors or parser.has_errors:
             print("MRT File with INCORRECT syntax")
         else:
-            for record in result:
-                print(record)
-
             print("MRT File with CORRECT syntax :)")
