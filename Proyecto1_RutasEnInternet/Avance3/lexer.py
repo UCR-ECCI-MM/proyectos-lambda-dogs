@@ -1,5 +1,4 @@
 import sys
-import time
 import re
 import ply.lex as lex
 
@@ -7,23 +6,23 @@ import ply.lex as lex
 # List of all token types that can be recognized by the lexer
 tokens = (
     'RECORD_TYPE',
-    'TIMESTAMP',
     'STATE',
     'IPADDR',
     'PIPE',
     'SLASH',
-    'NUMBER',
+    'NUM10',
+    'NUM9',
     'LBRACE',
     'RBRACE',
     'COMMA',
 )
 
-# Maximum value for a 32-bit unsigned integer, used to validate both
-# the TIMESTAMP token and the NUMBER token
+# Maximum value for a 32-bit unsigned integer. Just a 10 digit number
+# can exceed this limit (a number of up to 9 digits never does:
+# 999999999 < 4294967295), so the range check is only needed for
+# NUM10.
 MAX_UINT32 = 2**32 - 1
 
-
-# Token rules and their corresponding regular expressions
 
 # Recognizes the TABLE_DUMP2 value used at the beginning of each record
 def t_RECORD_TYPE(t):
@@ -37,67 +36,30 @@ def t_STATE(t):
     return t
 
 
-# Recognizes the timestamp field, which must have exactly 10 digits
-# (unix timestamp). It must be defined before t_NUMBER so PLY gives it
-# priority over the generic NUMBER rule.
-def t_TIMESTAMP(t):
-    r'(?<!\d)\d{10}(?!\d)'
-
-    value = int(t.value)
-
-    if value > MAX_UINT32:
-        print(
-            f"Lexical error [Line {t.lineno}]: "
-            f"Timestamp out of the allowed range (32-bit uint): {value}"
-        )
-        t.lexer.has_errors = True
-        return None
-
-    t.value = value
-    return t
-
-
 # Recognizes IPv4 addresses and makes sure each octet is between 0 and 255
 OCTET = r'(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'
+
 
 @lex.TOKEN(r'\b(' + OCTET + r'\.){3}' + OCTET + r'\b')
 def t_IPADDR(t):
     return t
 
 
-# Separators used between fields and between an address and its mask
 t_PIPE = r'\|'
-
-
-# Braces and commas used when an AS path contains a group of AS numbers
 t_LBRACE = r'\{'
 t_RBRACE = r'\}'
 t_COMMA = r','
+t_SLASH = r'/'
 
 
-# Numbers used for AS numbers, masks and AS paths (the timestamp field
-# is handled separately by t_TIMESTAMP)
-def t_SLASH(t):
-    r'/'
-    t.lexer.after_slash = True
-    return t
-
-
-def t_NUMBER(t):
-    r'\d+'
+# Numbers of EXACTLY 10 digits (e.g. a timestamp, or a Peer AS /
+# AS Path number that by coincidence also has 10 digits). Comes before
+# t_NUM9 so that PLY gives it priority when the complete lexeme has
+# 10 digits.
+def t_NUM10(t):
+    r'(?<!\d)\d{10}(?!\d)'
 
     value = int(t.value)
-    after_slash = getattr(t.lexer, 'after_slash', False)
-    t.lexer.after_slash = False  # el flag solo aplica al número inmediatamente después del '/'
-
-    if after_slash and value > 32:
-        print(
-            f"Lexical error [Line {t.lineno}]: "
-            f"Mask out of range (0-32): {value}"
-        )
-        t.lexer.has_errors = True
-        return None
-
     if value > MAX_UINT32:
         print(
             f"Lexical error [Line {t.lineno}]: "
@@ -107,6 +69,13 @@ def t_NUMBER(t):
         return None
 
     t.value = value
+    return t
+
+
+# Numbers of 1 to 9 digits (mask, or a Peer AS / AS Path number "shortened" to 9 digits). Comes after t_NUM10 so that PLY gives it priority when the complete lexeme has 10 digits.
+def t_NUM9(t):
+    r'(?<!\d)\d{1,9}(?!\d)'
+    t.value = int(t.value)
     return t
 
 
