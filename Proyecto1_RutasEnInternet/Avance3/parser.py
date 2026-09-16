@@ -6,60 +6,38 @@ import ply.yacc as yacc
 
 # ---------------------------------------------------------------------------
 # Lexer
+#
+# The lexer doesn't know in which field of the line it is: it only classifies each
+# sequence of digits by its length. All the ambiguity regarding Timestamp/Peer AS
+# is resolved later, in the grammar (see p_timestamp and p_peer_as).
 # ---------------------------------------------------------------------------
 
-# List of all token types that can be recognized by the lexer
 tokens = (
     'RECORD_TYPE',
-    'TIMESTAMP',
     'STATE',
     'IPADDR',
     'PIPE',
     'SLASH',
-    'NUMBER',
+    'NUM10',
+    'NUM9',
     'LBRACE',
     'RBRACE',
     'COMMA',
 )
 
-# Maximum value for a 32-bit unsigned integer, used to validate both
-# the TIMESTAMP token and the NUMBER token
 MAX_UINT32 = 2**32 - 1
 
 
-# Recognizes the TABLE_DUMP2 value used at the beginning of each record
 def t_RECORD_TYPE(t):
     r'TABLE_DUMP2\b'
     return t
 
 
-# Recognizes the possible states of a record: B, A or W
 def t_STATE(t):
     r'[BAW]\b'
     return t
 
 
-# Recognizes the timestamp field, which must have exactly 10 digits
-# (unix timestamp). It must be defined before t_NUMBER so PLY gives it
-# priority over the generic NUMBER rule.
-def t_TIMESTAMP(t):
-    r'(?<!\d)\d{10}(?!\d)'
-
-    value = int(t.value)
-
-    if value > MAX_UINT32:
-        print(
-            f"Lexical error [Line {t.lineno}]: "
-            f"Timestamp out of the allowed range (32-bit uint): {value}"
-        )
-        t.lexer.has_errors = True
-        return None
-
-    t.value = value
-    return t
-
-
-# Recognizes IPv4 addresses and makes sure each octet is between 0 and 255
 OCTET = r'(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'
 
 
@@ -68,37 +46,18 @@ def t_IPADDR(t):
     return t
 
 
-# Separators used between fields and between an address and its mask
 t_PIPE = r'\|'
-
-
-# Braces and commas used when an AS path contains a group of AS numbers
 t_LBRACE = r'\{'
 t_RBRACE = r'\}'
 t_COMMA = r','
+t_SLASH = r'/'
 
 
-def t_SLASH(t):
-    r'/'
-    t.lexer.after_slash = True
-    return t
-
-
-def t_NUMBER(t):
-    r'\d+'
+# Exactly 10 digits. Defined before t_NUM9 so it has priority.
+def t_NUM10(t):
+    r'(?<!\d)\d{10}(?!\d)'
 
     value = int(t.value)
-    after_slash = getattr(t.lexer, 'after_slash', False)
-    t.lexer.after_slash = False  # el flag solo aplica al número inmediatamente después del '/'
-
-    if after_slash and value > 32:
-        print(
-            f"Lexical error [Line {t.lineno}]: "
-            f"Mask out of range (0-32): {value}"
-        )
-        t.lexer.has_errors = True
-        return None
-
     if value > MAX_UINT32:
         print(
             f"Lexical error [Line {t.lineno}]: "
@@ -111,22 +70,24 @@ def t_NUMBER(t):
     return t
 
 
-# Keeps track of line numbers when the lexer finds one or more newlines
+# Numbers of 1 to 9 digits (never can exceed 2**32 - 1, so no range validation needed here)
+def t_NUM9(t):
+    r'(?<!\d)\d{1,9}(?!\d)'
+    t.value = int(t.value)
+    return t
+
+
 def t_newline(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
 
 
-# Spaces, tabs and carriage returns do not need to be returned as tokens
 t_ignore = ' \t\r'
 
-
-# Handles text that does not match any of the defined token rules
 _illegal_run = re.compile(r'[^\s|/{},]+')
 
 
 def t_error(t):
-    # Try to report the whole invalid sequence instead of one character at a time
     match = _illegal_run.match(t.value)
     bad_lexeme = match.group(0) if match else t.value[0]
 
@@ -144,6 +105,10 @@ lexer = lex.lex()
 
 # ---------------------------------------------------------------------------
 # Parser
+#
+# Convention: UPPERCASE only for terminals (tokens). The variables/non
+# terminals (archivo, linea, timestamp, peer_as, prefix, mask, as_path,
+# as_element, as_num, as_set, as_set_list) go in lowercase.
 # ---------------------------------------------------------------------------
 
 def p_archivo_multiple(p):
@@ -155,8 +120,8 @@ def p_archivo_single(p):
     p[0] = None
 
 def p_linea(p):
-    ('linea : RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE '
-     'NUMBER PIPE prefix PIPE as_path')
+    ('linea : RECORD_TYPE PIPE timestamp PIPE STATE PIPE IPADDR PIPE '
+     'peer_as PIPE prefix PIPE as_path')
 
     peer_as = p[9]
     as_numbers = p[13]
@@ -170,9 +135,36 @@ def p_linea(p):
 
     p[0] = None
 
+# The timestamp ALWAYS must be a number of exactly 10 digits
+def p_timestamp(p):
+    'timestamp : NUM10'
+    p[0] = p[1]
+
+# The Peer AS can come as a 10-digit number (e.g. 4294967295) or
+# as a 9-digit number (the vast majority of real-world cases)
+def p_peer_as_10(p):
+    'peer_as : NUM10'
+    p[0] = p[1]
+
+def p_peer_as_9(p):
+    'peer_as : NUM9'
+    p[0] = p[1]
+
 def p_prefix(p):
-    'prefix : IPADDR SLASH NUMBER'
+    'prefix : IPADDR SLASH mask'
     p[0] = None
+
+# The mask always fits in 9 digits (ranges from 0 to 32)
+def p_mask(p):
+    'mask : NUM9'
+    value = p[1]
+    if not (0 <= value <= 32):
+        print(
+            f"Semantic error [Line {p.lineno(1)}]: "
+            f"Mask out of range (0-32): {value}"
+        )
+        parser.has_errors = True
+    p[0] = value
 
 def p_as_path_multiple(p):
     'as_path : as_element as_path'
@@ -183,11 +175,21 @@ def p_as_path_single(p):
     p[0] = p[1]
 
 def p_as_element_num(p):
-    'as_element : NUMBER'
+    'as_element : as_num'
     p[0] = [p[1]]
 
 def p_as_element_set(p):
     'as_element : as_set'
+    p[0] = p[1]
+
+# Same as peer_as: an AS within the AS_PATH can also have 10 or 9
+# digits, for the same reason (ASN up to 32 bits)
+def p_as_num_10(p):
+    'as_num : NUM10'
+    p[0] = p[1]
+
+def p_as_num_9(p):
+    'as_num : NUM9'
     p[0] = p[1]
 
 def p_as_set(p):
@@ -195,11 +197,11 @@ def p_as_set(p):
     p[0] = p[2]
 
 def p_as_set_list_multiple(p):
-    'as_set_list : NUMBER COMMA as_set_list'
+    'as_set_list : as_num COMMA as_set_list'
     p[0] = [p[1]] + p[3]
 
 def p_as_set_list_single(p):
-    'as_set_list : NUMBER'
+    'as_set_list : as_num'
     p[0] = [p[1]]
 
 def p_error(p):
