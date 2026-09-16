@@ -1,0 +1,23 @@
+=== Tokens ===
+LexToken(RECORD_TYPE,'TABLE_DUMP2',1,0)
+LexToken(PIPE,'|',1,11)
+LexToken(TIMESTAMP,1785888000,1,12)
+LexToken(PIPE,'|',1,22)
+LexToken(PIPE,'|',1,26)
+LexToken(IPADDR,'186.211.128.34',1,27)
+LexToken(PIPE,'|',1,41)
+LexToken(NUMBER,14840,1,42)
+LexToken(PIPE,'|',1,47)
+LexToken(IPADDR,'37.52.0.0',1,48)
+LexToken(SLASH,'/',1,57)
+LexToken(NUMBER,14,1,58)
+LexToken(PIPE,'|',1,60)
+LexToken(NUMBER,14840,1,61)
+LexToken(NUMBER,6849,1,67)
+LexToken(LBRACE,'{',1,72)
+LexToken(NUMBER,6877,1,73)
+LexToken(RBRACE,'}',1,77)
+MRT File with INCORRECT tokens
+
+=== Parse ===
+MRT File with INCORRECT syntax

@@ -1,0 +1,47 @@
+# Gramática
+
+## Especificación formal de la gramática
+
+```text
+Se define la gramatica G={V,T,A,S} de la siguiente manera:
+
+Variables (no terminales) 
+
+V = {︃ ARCHIVO, LINEA, PREFIX, AS_PATH, AS_ELEMENT, 
+    AS_SET, AS_SET_LIST}
+
+Terminales 
+T = { RECORD_TYPE, PIPE, STATE, IPADDR, SLASH, TIMESTAMP, PEER_AS, 
+    MASK, AS_PATH_NUM, LBRACE, RBRACE, COMMA }
+
+Simbolo inicial S =ARCHIVO
+```
+
+## Gramática a utilizar
+
+```text
+
+ARCHIVO → LINEA
+
+ARCHIVO → LINEA ARCHIVO
+
+LINEA → RECORD_TYPE PIPE TIMESTAMP PIPE STATE 
+        PIPE IPADDR PIPE PEER_AS PIPE PREFIX 
+        PIPE AS_PATH 
+
+PREFIX → IPADDR SLASH MASK
+
+AS_PATH → AS_ELEMENT
+
+AS_PATH → AS_ELEMENT AS_PATH
+
+AS_ELEMENT → AS_PATH_NUM
+
+AS_ELEMENT → AS_SET
+
+AS_SET → LBRACE AS_SET_LIST RBRACE
+
+AS_SET_LIST → AS_PATH_NUM
+
+AS_SET_LIST → AS_PATH_NUM COMMA AS_SET_LIST
+```
