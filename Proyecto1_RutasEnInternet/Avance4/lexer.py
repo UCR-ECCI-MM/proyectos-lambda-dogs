@@ -57,7 +57,7 @@ t_SLASH = r'/'
 # t_NUM9 so that PLY gives it priority when the complete lexeme has
 # 10 digits.
 def t_NUM10(t):
-    r'(?<!\d)\d{10}(?!\d)'
+    r'\d{10}'
 
     value = int(t.value)
     if value > MAX_UINT32:
@@ -74,7 +74,7 @@ def t_NUM10(t):
 
 # Numbers of 1 to 9 digits (mask, or a Peer AS / AS Path number "shortened" to 9 digits). Comes after t_NUM10 so that PLY gives it priority when the complete lexeme has 10 digits.
 def t_NUM9(t):
-    r'(?<!\d)\d{1,9}(?!\d)'
+    r'\d{1,9}'
     t.value = int(t.value)
     return t
 

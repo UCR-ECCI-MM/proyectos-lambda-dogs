@@ -55,7 +55,7 @@ t_SLASH = r'/'
 
 # Exactly 10 digits. Defined before t_NUM9 so it has priority.
 def t_NUM10(t):
-    r'(?<!\d)\d{10}(?!\d)'
+    r'\d{10}'
 
     value = int(t.value)
     if value > MAX_UINT32:
@@ -72,7 +72,7 @@ def t_NUM10(t):
 
 # Numbers of 1 to 9 digits (never can exceed 2**32 - 1, so no range validation needed here)
 def t_NUM9(t):
-    r'(?<!\d)\d{1,9}(?!\d)'
+    r'\d{1,9}'
     t.value = int(t.value)
     return t
 
