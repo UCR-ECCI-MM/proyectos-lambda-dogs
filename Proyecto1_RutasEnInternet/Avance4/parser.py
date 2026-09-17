@@ -164,21 +164,56 @@ def p_archivo_single(p):
     'archivo : linea'
     p[0] = None
 
+
 def p_linea(p):
     ('linea : RECORD_TYPE PIPE timestamp PIPE STATE PIPE IPADDR PIPE '
      'peer_as PIPE prefix PIPE as_path')
-
+ 
+    record_type = p[1]
+    timestamp = p[3]
+    state = p[5]
+    peer_ip = p[7]
     peer_as = p[9]
-    as_numbers = p[13]
-
+    prefix = p[11]
+     # list of elements (int AS numbers or sets)
+    as_path = p[13]
+ 
+    as_numbers = flatten_as_path(as_path)
+ 
     if peer_as not in as_numbers:
         print(
             f"Semantic error [Line {p.lineno(1)}]: "
             f"PEER_AS ({peer_as}) does not appear in AS_PATH {sorted(as_numbers)}"
         )
         parser.has_errors = True
-
-    p[0] = None
+ 
+    record = {
+        'record_type': record_type,
+        'timestamp': timestamp,
+        'state': state,
+        'peer_ip': peer_ip,
+        'peer_as': peer_as,
+        'prefix': prefix,
+        'as_path': as_path,
+    }
+    # list
+    records.append(record)                                    
+ 
+    prefix_key = f"{prefix['ip']}/{prefix['mask']}"
+    # dict
+    routing_table.setdefault(prefix_key, []).append(record)
+ 
+    # set every distinct AS number seen so far
+    all_as_numbers.update(as_numbers)
+    all_as_numbers.add(peer_as)
+ 
+    # graph AS-level adjacency implied by this AS_PATH
+    for left, right in zip(as_numbers, as_numbers[1:]):
+        as_graph.add_edge(left, right)
+    if as_numbers:
+        as_graph.add_node(as_numbers[0])
+ 
+    p[0] = record
 
 # The timestamp ALWAYS must be a number of exactly 10 digits
 def p_timestamp(p):
