@@ -260,7 +260,7 @@ def p_as_element_num(p):
 
 def p_as_element_set(p):
     'as_element : as_set'
-    p[0] = p[1]
+    p[0] = [p[1]]
 
 # Same as peer_as: an AS within the AS_PATH can also have 10 or 9
 # digits, for the same reason (ASN up to 32 bits)
