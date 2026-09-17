@@ -102,6 +102,51 @@ def t_error(t):
 
 lexer = lex.lex()
 
+# ---------------------------------------------------------------------------
+# Dynamic data structures
+# ---------------------------------------------------------------------------
+ 
+class ASGraph:
+    def __init__(self):
+        self.adjacency = {}
+ 
+    def add_node(self, as_number):
+        self.adjacency.setdefault(as_number, set())
+ 
+    def add_edge(self, as1, as2):
+        self.add_node(as1)
+        self.add_node(as2)
+        self.adjacency[as1].add(as2)
+        self.adjacency[as2].add(as1)
+ 
+    def nodes(self):
+        return set(self.adjacency.keys())
+ 
+    def edges(self):
+        seen = set()
+        result = []
+        for a, neighbors in self.adjacency.items():
+            for b in neighbors:
+                if (b, a) not in seen:
+                    seen.add((a, b))
+                    result.append((a, b))
+        return result
+ 
+    def degree(self, as_number):
+        return len(self.adjacency.get(as_number, set()))
+ 
+ 
+# Global containers populated dynamically while the file is parsed
+ 
+def flatten_as_path(as_path):
+    flat = []
+    for element in as_path:
+        if isinstance(element, set):
+            flat.extend(sorted(element))
+        else:
+            flat.append(element)
+    return flat
+
 
 # ---------------------------------------------------------------------------
 # Parser
