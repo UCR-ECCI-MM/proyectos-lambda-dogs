@@ -69,8 +69,6 @@ def t_NUM10(t):
     t.value = value
     return t
 
-
-# Numbers of 1 to 9 digits (never can exceed 2**32 - 1, so no range validation needed here)
 def t_NUM9(t):
     r'\d{1,9}'
     t.value = int(t.value)
@@ -102,6 +100,53 @@ def t_error(t):
 
 lexer = lex.lex()
 
+class ASGraph:
+
+    def __init__(self):
+        self.adjacency = {}  # dict: AS number -> set of neighboring AS numbers
+
+    def add_node(self, as_number):
+        self.adjacency.setdefault(as_number, set())
+
+    def add_edge(self, as1, as2):
+        self.add_node(as1)
+        self.add_node(as2)
+        self.adjacency[as1].add(as2)
+        self.adjacency[as2].add(as1)
+
+    def nodes(self):
+        return set(self.adjacency.keys())
+
+    def edges(self):
+        seen = set()
+        result = []
+        for a, neighbors in self.adjacency.items():
+            for b in neighbors:
+                if (b, a) not in seen:
+                    seen.add((a, b))
+                    result.append((a, b))
+        return result
+
+    def degree(self, as_number):
+        return len(self.adjacency.get(as_number, set()))
+
+
+# Global containers populated dynamically while the file is parsed
+records = []
+routing_table = {}
+all_as_numbers = set()
+as_graph = ASGraph()
+
+
+def flatten_as_path(as_path):
+    flat = []
+    for element in as_path:
+        if isinstance(element, set):
+            flat.extend(sorted(element))
+        else:
+            flat.append(element)
+    return flat
+
 
 # ---------------------------------------------------------------------------
 # Parser
@@ -123,8 +168,15 @@ def p_linea(p):
     ('linea : RECORD_TYPE PIPE timestamp PIPE STATE PIPE IPADDR PIPE '
      'peer_as PIPE prefix PIPE as_path')
 
+    record_type = p[1]
+    timestamp = p[3]
+    state = p[5]
+    peer_ip = p[7]
     peer_as = p[9]
-    as_numbers = p[13]
+    prefix = p[11]
+    as_path = p[13]
+
+    as_numbers = flatten_as_path(as_path)
 
     if peer_as not in as_numbers:
         print(
@@ -133,15 +185,38 @@ def p_linea(p):
         )
         parser.has_errors = True
 
-    p[0] = None
+    record = {
+        'record_type': record_type,
+        'timestamp': timestamp,
+        'state': state,
+        'peer_ip': peer_ip,
+        'peer_as': peer_as,
+        'prefix': prefix,
+        'as_path': as_path,
+    }
+    # list
+    records.append(record)
 
-# The timestamp ALWAYS must be a number of exactly 10 digits
+    prefix_key = f"{prefix['ip']}/{prefix['mask']}"
+    # dict
+    routing_table.setdefault(prefix_key, []).append(record)
+
+    # set: every distinct AS number seen so far
+    all_as_numbers.update(as_numbers)
+    all_as_numbers.add(peer_as)
+
+    # graph: AS-level adjacency implied by this AS_PATH
+    for left, right in zip(as_numbers, as_numbers[1:]):
+        as_graph.add_edge(left, right)
+    if as_numbers:
+        as_graph.add_node(as_numbers[0])
+
+    p[0] = record
+
 def p_timestamp(p):
     'timestamp : NUM10'
     p[0] = p[1]
 
-# The Peer AS can come as a 10-digit number (e.g. 4294967295) or
-# as a 9-digit number (the vast majority of real-world cases)
 def p_peer_as_10(p):
     'peer_as : NUM10'
     p[0] = p[1]
@@ -152,7 +227,7 @@ def p_peer_as_9(p):
 
 def p_prefix(p):
     'prefix : IPADDR SLASH mask'
-    p[0] = None
+    p[0] = {'ip': p[1], 'mask': p[3]}
 
 # The mask always fits in 9 digits (ranges from 0 to 32)
 def p_mask(p):
@@ -180,10 +255,8 @@ def p_as_element_num(p):
 
 def p_as_element_set(p):
     'as_element : as_set'
-    p[0] = p[1]
+    p[0] = [p[1]]
 
-# Same as peer_as: an AS within the AS_PATH can also have 10 or 9
-# digits, for the same reason (ASN up to 32 bits)
 def p_as_num_10(p):
     'as_num : NUM10'
     p[0] = p[1]
@@ -194,7 +267,7 @@ def p_as_num_9(p):
 
 def p_as_set(p):
     'as_set : LBRACE as_set_list RBRACE'
-    p[0] = p[2]
+    p[0] = set(p[2])
 
 def p_as_set_list_multiple(p):
     'as_set_list : as_num COMMA as_set_list'
@@ -213,78 +286,3 @@ def p_error(p):
     parser.has_errors = True
 
 parser = yacc.yacc()
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("Usage: python mrtparser.py <mrt_dump_file>")
-        sys.exit(1)
-
-    input_path = sys.argv[1]
-
-    with open(input_path, 'r') as f:
-        data = f.read()
-
-    lexer.lineno = 1
-    lexer.has_errors = False
-    lexer.input(data)
-
-    collected_tokens = []
-
-    while True:
-        tok = lexer.token()
-        if not tok:
-            break
-        collected_tokens.append(tok)
-
-    choice = input(
-        "Show results in (C)onsole or save them in a (F)ile? [C/F]: "
-    ).strip().upper()
-
-    lexer.lineno = 1
-    lexer.has_errors = False
-    parser.has_errors = False
-
-    parser.parse(data, lexer=lexer, tracking=True)
-    if choice == 'F':
-        with open("ParserOutput.txt", "w") as out_file:
-
-            out_file.write("=== Tokens ===\n")
-
-            for tok in collected_tokens:
-                out_file.write(f"{tok}\n")
-
-            if lexer.has_errors:
-                out_file.write("MRT File with INCORRECT tokens\n")
-            else:
-                out_file.write("MRT File with CORRECT tokens :)\n")
-
-            out_file.write("\n=== Parse ===\n")
-
-            if lexer.has_errors or parser.has_errors:
-                out_file.write("MRT File with INCORRECT syntax\n")
-            else:
-                out_file.write("MRT File with CORRECT syntax :)\n")
-
-        print("Results saved in ParserOutput.txt")
-
-    else:
-        print("=== Tokens ===")
-
-        for tok in collected_tokens:
-            print(tok)
-
-        if lexer.has_errors:
-            print("MRT File with INCORRECT tokens")
-        else:
-            print("MRT File with CORRECT tokens :)")
-
-        print("\n=== Parse ===")
-
-        if lexer.has_errors or parser.has_errors:
-            print("MRT File with INCORRECT syntax")
-        else:
-            print("MRT File with CORRECT syntax :)")

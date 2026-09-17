@@ -6,9 +6,9 @@ _tabversion = '3.10'
 
 _lr_method = 'LALR'
 
-_lr_signature = 'COMMA IPADDR LBRACE NUMBER PIPE RBRACE RECORD_TYPE SLASH STATE TIMESTAMParchivo : linea archivoarchivo : linealinea : RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_pathprefix : IPADDR SLASH NUMBERas_path : as_element as_pathas_path : as_elementas_element : NUMBERas_element : as_setas_set : LBRACE as_set_list RBRACEas_set_list : NUMBER COMMA as_set_listas_set_list : NUMBER'
+_lr_signature = 'COMMA IPADDR LBRACE NUM10 NUM9 PIPE RBRACE RECORD_TYPE SLASH STATEarchivo : linea archivoarchivo : linealinea : RECORD_TYPE PIPE timestamp PIPE STATE PIPE IPADDR PIPE peer_as PIPE prefix PIPE as_pathtimestamp : NUM10peer_as : NUM10peer_as : NUM9prefix : IPADDR SLASH maskmask : NUM9as_path : as_element as_pathas_path : as_elementas_element : as_numas_element : as_setas_num : NUM10as_num : NUM9as_set : LBRACE as_set_list RBRACEas_set_list : as_num COMMA as_set_listas_set_list : as_num'
     
-_lr_action_items = {'RECORD_TYPE':([0,2,19,20,21,22,24,27,],[3,3,-7,-3,-6,-8,-5,-9,]),'$end':([1,2,4,19,20,21,22,24,27,],[0,-2,-1,-7,-3,-6,-8,-5,-9,]),'PIPE':([3,6,8,10,12,15,18,],[5,7,9,11,13,17,-4,]),'TIMESTAMP':([5,],[6,]),'STATE':([7,],[8,]),'IPADDR':([9,13,],[10,14,]),'NUMBER':([11,16,17,19,21,22,23,27,28,],[12,18,19,-7,19,-8,26,-9,26,]),'SLASH':([14,],[16,]),'LBRACE':([17,19,21,22,27,],[23,-7,23,-8,-9,]),'RBRACE':([25,26,29,],[27,-11,-10,]),'COMMA':([26,],[28,]),}
+_lr_action_items = {'RECORD_TYPE':([0,2,23,24,25,26,27,28,30,33,],[3,3,-3,-10,-11,-12,-13,-14,-9,-15,]),'$end':([1,2,4,23,24,25,26,27,28,30,33,],[0,-2,-1,-3,-10,-11,-12,-13,-14,-9,-15,]),'PIPE':([3,6,7,9,11,13,14,15,18,21,22,],[5,8,-4,10,12,16,-5,-6,20,-7,-8,]),'NUM10':([5,12,20,24,25,26,27,28,29,33,34,],[7,14,27,27,-11,-12,-13,-14,27,-15,27,]),'STATE':([8,],[9,]),'IPADDR':([10,16,],[11,17,]),'NUM9':([12,19,20,24,25,26,27,28,29,33,34,],[15,22,28,28,-11,-12,-13,-14,28,-15,28,]),'SLASH':([17,],[19,]),'LBRACE':([20,24,25,26,27,28,33,],[29,29,-11,-12,-13,-14,-15,]),'COMMA':([27,28,32,],[-13,-14,34,]),'RBRACE':([27,28,31,32,35,],[-13,-14,33,-17,-16,]),}
 
 _lr_action = {}
 for _k, _v in _lr_action_items.items():
@@ -17,7 +17,7 @@ for _k, _v in _lr_action_items.items():
       _lr_action[_x][_k] = _y
 del _lr_action_items
 
-_lr_goto_items = {'archivo':([0,2,],[1,4,]),'linea':([0,2,],[2,2,]),'prefix':([13,],[15,]),'as_path':([17,21,],[20,24,]),'as_element':([17,21,],[21,21,]),'as_set':([17,21,],[22,22,]),'as_set_list':([23,28,],[25,29,]),}
+_lr_goto_items = {'archivo':([0,2,],[1,4,]),'linea':([0,2,],[2,2,]),'timestamp':([5,],[6,]),'peer_as':([12,],[13,]),'prefix':([16,],[18,]),'mask':([19,],[21,]),'as_path':([20,24,],[23,30,]),'as_element':([20,24,],[24,24,]),'as_num':([20,24,29,34,],[25,25,32,32,]),'as_set':([20,24,],[26,26,]),'as_set_list':([29,34,],[31,35,]),}
 
 _lr_goto = {}
 for _k, _v in _lr_goto_items.items():
@@ -27,15 +27,21 @@ for _k, _v in _lr_goto_items.items():
 del _lr_goto_items
 _lr_productions = [
   ("S' -> archivo","S'",1,None,None,None),
-  ('archivo -> linea archivo','archivo',2,'p_archivo_multiple','parser.py',150),
-  ('archivo -> linea','archivo',1,'p_archivo_single','parser.py',154),
-  ('linea -> RECORD_TYPE PIPE TIMESTAMP PIPE STATE PIPE IPADDR PIPE NUMBER PIPE prefix PIPE as_path','linea',13,'p_linea','parser.py',158),
-  ('prefix -> IPADDR SLASH NUMBER','prefix',3,'p_prefix','parser.py',171),
-  ('as_path -> as_element as_path','as_path',2,'p_as_path_multiple','parser.py',175),
-  ('as_path -> as_element','as_path',1,'p_as_path_single','parser.py',179),
-  ('as_element -> NUMBER','as_element',1,'p_as_element_num','parser.py',183),
-  ('as_element -> as_set','as_element',1,'p_as_element_set','parser.py',187),
-  ('as_set -> LBRACE as_set_list RBRACE','as_set',3,'p_as_set','parser.py',191),
-  ('as_set_list -> NUMBER COMMA as_set_list','as_set_list',3,'p_as_set_list_multiple','parser.py',195),
-  ('as_set_list -> NUMBER','as_set_list',1,'p_as_set_list_single','parser.py',199),
+  ('archivo -> linea archivo','archivo',2,'p_archivo_multiple','parser.py',191),
+  ('archivo -> linea','archivo',1,'p_archivo_single','parser.py',195),
+  ('linea -> RECORD_TYPE PIPE timestamp PIPE STATE PIPE IPADDR PIPE peer_as PIPE prefix PIPE as_path','linea',13,'p_linea','parser.py',199),
+  ('timestamp -> NUM10','timestamp',1,'p_timestamp','parser.py',249),
+  ('peer_as -> NUM10','peer_as',1,'p_peer_as_10','parser.py',255),
+  ('peer_as -> NUM9','peer_as',1,'p_peer_as_9','parser.py',259),
+  ('prefix -> IPADDR SLASH mask','prefix',3,'p_prefix','parser.py',263),
+  ('mask -> NUM9','mask',1,'p_mask','parser.py',269),
+  ('as_path -> as_element as_path','as_path',2,'p_as_path_multiple','parser.py',280),
+  ('as_path -> as_element','as_path',1,'p_as_path_single','parser.py',284),
+  ('as_element -> as_num','as_element',1,'p_as_element_num','parser.py',288),
+  ('as_element -> as_set','as_element',1,'p_as_element_set','parser.py',293),
+  ('as_num -> NUM10','as_num',1,'p_as_num_10','parser.py',302),
+  ('as_num -> NUM9','as_num',1,'p_as_num_9','parser.py',306),
+  ('as_set -> LBRACE as_set_list RBRACE','as_set',3,'p_as_set','parser.py',310),
+  ('as_set_list -> as_num COMMA as_set_list','as_set_list',3,'p_as_set_list_multiple','parser.py',315),
+  ('as_set_list -> as_num','as_set_list',1,'p_as_set_list_single','parser.py',319),
 ]
