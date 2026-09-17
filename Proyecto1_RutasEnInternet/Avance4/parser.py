@@ -232,7 +232,7 @@ def p_peer_as_9(p):
 
 def p_prefix(p):
     'prefix : IPADDR SLASH mask'
-    p[0] = None
+    p[0] = {'ip': p[1], 'mask': p[3]}
 
 # The mask always fits in 9 digits (ranges from 0 to 32)
 def p_mask(p):
