@@ -293,25 +293,13 @@ parser = yacc.yacc()
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print("Usage: python mrtparser.py <mrt_dump_file>")
+        print("Usage: python parser.py <mrt_dump_file>")
         sys.exit(1)
 
     input_path = sys.argv[1]
 
     with open(input_path, 'r') as f:
         data = f.read()
-
-    lexer.lineno = 1
-    lexer.has_errors = False
-    lexer.input(data)
-
-    collected_tokens = []
-
-    while True:
-        tok = lexer.token()
-        if not tok:
-            break
-        collected_tokens.append(tok)
 
     choice = input(
         "Show results in (C)onsole or save them in a (F)ile? [C/F]: "
@@ -329,55 +317,34 @@ if __name__ == '__main__':
 
     parser.parse(data, lexer=lexer, tracking=True)
 
-    structures_summary = (
+    lines = []
+
+    if lexer.has_errors:
+        lines.append("MRT File with INCORRECT tokens")
+    else:
+        lines.append("MRT File with CORRECT tokens :)")
+
+    lines.append("\n=== Parse ===")
+
+    if lexer.has_errors or parser.has_errors:
+        lines.append("MRT File with INCORRECT syntax")
+    else:
+        lines.append("MRT File with CORRECT syntax :)")
+
+    lines.append(
         "\n=== Dynamically built structures ===\n"
         f"Records parsed (list):        {len(records)}\n"
         f"Distinct prefixes (dict):     {len(routing_table)}\n"
         f"Distinct AS numbers (set):    {len(all_as_numbers)}\n"
         f"AS graph nodes:               {len(as_graph.nodes())}\n"
-        f"AS graph edges:               {len(as_graph.edges())}\n"
+        f"AS graph edges:               {len(as_graph.edges())}"
     )
+
+    output = "\n".join(lines) + "\n"
 
     if choice == 'F':
         with open("ParserOutput.txt", "w") as out_file:
-
-            out_file.write("=== Tokens ===\n")
-
-            for tok in collected_tokens:
-                out_file.write(f"{tok}\n")
-
-            if lexer.has_errors:
-                out_file.write("MRT File with INCORRECT tokens\n")
-            else:
-                out_file.write("MRT File with CORRECT tokens :)\n")
-
-            out_file.write("\n=== Parse ===\n")
-
-            if lexer.has_errors or parser.has_errors:
-                out_file.write("MRT File with INCORRECT syntax\n")
-            else:
-                out_file.write("MRT File with CORRECT syntax :)\n")
-
-            out_file.write(structures_summary)
-
+            out_file.write(output)
         print("Results saved in ParserOutput.txt")
-
     else:
-        print("=== Tokens ===")
-
-        for tok in collected_tokens:
-            print(tok)
-
-        if lexer.has_errors:
-            print("MRT File with INCORRECT tokens")
-        else:
-            print("MRT File with CORRECT tokens :)")
-
-        print("\n=== Parse ===")
-
-        if lexer.has_errors or parser.has_errors:
-            print("MRT File with INCORRECT syntax")
-        else:
-            print("MRT File with CORRECT syntax :)")
-
-        print(structures_summary)
+        print(output, end="")
