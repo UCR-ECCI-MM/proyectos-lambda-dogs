@@ -3,6 +3,8 @@ import re
 import ply.lex as lex
 import ply.yacc as yacc
 
+from display import C, strip_ansi, render_structures_report
+
 
 # ---------------------------------------------------------------------------
 # Lexer
@@ -320,31 +322,25 @@ if __name__ == '__main__':
     lines = []
 
     if lexer.has_errors:
-        lines.append("MRT File with INCORRECT tokens")
+        lines.append(f"{C.RED}✗ MRT File with INCORRECT tokens{C.RESET}")
     else:
-        lines.append("MRT File with CORRECT tokens :)")
-
-    lines.append("\n=== Parse ===")
+        lines.append(f"{C.GREEN}✓ MRT File with CORRECT tokens{C.RESET}")
 
     if lexer.has_errors or parser.has_errors:
-        lines.append("MRT File with INCORRECT syntax")
+        lines.append(f"{C.RED}✗ MRT File with INCORRECT syntax{C.RESET}")
     else:
-        lines.append("MRT File with CORRECT syntax :)")
+        lines.append(f"{C.GREEN}✓ MRT File with CORRECT syntax{C.RESET}")
 
-    lines.append(
-        "\n=== Dynamically built structures ===\n"
-        f"Records parsed (list):        {len(records)}\n"
-        f"Distinct prefixes (dict):     {len(routing_table)}\n"
-        f"Distinct AS numbers (set):    {len(all_as_numbers)}\n"
-        f"AS graph nodes:               {len(as_graph.nodes())}\n"
-        f"AS graph edges:               {len(as_graph.edges())}"
+    lines.append("")
+    lines += render_structures_report(
+        records, routing_table, all_as_numbers, as_graph, flatten_as_path
     )
 
     output = "\n".join(lines) + "\n"
 
     if choice == 'F':
         with open("ParserOutput.txt", "w") as out_file:
-            out_file.write(output)
+            out_file.write(strip_ansi(output))
         print("Results saved in ParserOutput.txt")
     else:
         print(output, end="")

@@ -21,9 +21,22 @@ Cada vez que la acción semántica de la regla `linea` se dispara (es decir, cad
 | `all_as_numbers` | `set[int]` | Conjunto de todos los números de AS vistos (como peer o como parte de algún AS_PATH), sin duplicados, para consultas rápidas de pertenencia. |
 | `as_graph` (clase `ASGraph`) | `dict[int, set[int]]` (lista de adyacencia) | Modela la topología de Internet implícita en los AS_PATH: cada AS_PATH aporta aristas entre AS consecutivos. Un grafo con lista de adyacencia permite responder eficientemente "¿cuáles son los vecinos de este AS?" (funcionalidad 2 del enunciado) y es la base natural para, más adelante, buscar todas las rutas entre dos AS (funcionalidad 3), sin tener que recorrer linealmente todos los registros. |
 
-Estas cuatro estructuras se llenan directamente en las acciones de la gramática (no en un paso posterior de post-procesamiento), cumpliendo con lo pedido para este avance. Al final de la ejecución, `parser.py` imprime un resumen con la cantidad de elementos en cada una.
+Estas cuatro estructuras se llenan directamente en las acciones de la gramática (no en un paso posterior de post-procesamiento), cumpliendo con lo pedido para este avance.
 
-Se probó el parser contra el archivo de ejemplo grande (`prueba`, 500 000 líneas): corre en ~30 segundos, sin errores léxicos ni sintácticos, y produce 500 000 registros, 46 962 prefijos distintos, 5 876 AS distintos y un grafo de 5 876 nodos con 13 939 aristas.
+## Visualización en terminal
+
+En vez de imprimir un resumen plano, `parser.py` termina la ejecución con un reporte armado en **Python puro** (sin librerías externas: solo caracteres de caja Unicode `┌─│╔═║` y colores ANSI), construido directamente a partir de las cuatro estructuras. Esta parte vive en su propio archivo, **`display.py`**, para no mezclar la lógica de presentación con el lexer/gramática de `parser.py`; este último simplemente hace `from display import ... render_structures_report` y le pasa `records`, `routing_table`, `all_as_numbers`, `as_graph` y `flatten_as_path`. `display.py` no importa nada de `parser.py`, así que se puede reutilizar o probar por separado.
+
+El reporte incluye:
+
+- **Panel de resumen** — cantidad de registros, prefijos, AS y nodos/aristas del grafo.
+- **Tabla de los AS más conectados** — los de mayor grado en `as_graph`, con cuántos prefijos originan (según `routing_table`); se muestran los primeros N con una nota de cuántos quedan afuera.
+- **Tabla de posibles *prefix hijacks*** — prefijos de `routing_table` anunciados con más de un AS de origen distinto (el origen de una ruta es el último AS del AS_PATH); resaltada en rojo/amarillo si hay conflictos, o un check verde si no hay ninguno. Es justo el análisis que pide la funcionalidad 1 del enunciado, mostrado aquí como parte del reporte de estructuras.
+- **Árbol del grafo de AS** — recorrido tipo `tree` de dos niveles a partir del AS más conectado, para que la topología construida en `as_graph` se vea, no solo se cuente.
+
+Los colores se generan siempre, pero al guardar en archivo (opción `F`) se limpian automáticamente los códigos ANSI, así que `ParserOutput.txt` queda como texto plano legible (las tablas y el árbol se conservan, solo sin color).
+
+Se probó el parser contra el archivo de ejemplo grande (`prueba`, 500 000 líneas): corre en ~27 segundos, sin errores léxicos ni sintácticos, produce 500 000 registros, 46 962 prefijos distintos, 5 876 AS distintos, un grafo de 5 876 nodos con 13 939 aristas, y detecta 128 prefijos con más de un AS de origen.
 
 ## Gramática formal
 
@@ -59,7 +72,8 @@ Documento de referencia del enunciado original: `Gramatica_Proyecto_1.pdf` (nota
 | Archivo | Descripción |
 |---|---|
 | `lexer.py` | Analizador léxico independiente. Reconoce los tokens del lenguaje (`RECORD_TYPE`, `STATE`, `IPADDR`, `PIPE`, `SLASH`, `NUM10`, `NUM9`, `LBRACE`, `RBRACE`, `COMMA`) y valida rangos (números de 10 dígitos como enteros de 32 bits, octetos de IP entre 0 y 255). Reporta errores léxicos indicando la línea y el lexema inválido. Puede ejecutarse de forma independiente sobre un archivo MRT y mostrar o guardar los tokens generados. |
-| `parser.py` | Analizador léxico-sintáctico completo, con creación dinámica de estructuras. Incluye su propia copia del lexer y añade las reglas gramaticales (`archivo`, `linea`, `prefix`, `as_path`, `as_element`, `as_set`, `as_set_list`) usando `ply.yacc`, construyendo así el parser LALR de la gramática definida. Las acciones semánticas también alimentan `records`, `routing_table`, `all_as_numbers` y `as_graph` (ver sección anterior). Reporta errores léxicos, sintácticos y un error semántico (PEER_AS que no aparece como primer elemento del AS_PATH). No imprime el listado de tokens: solo indica si el archivo tiene tokens/sintaxis correctos y muestra el resumen de las estructuras construidas — eso mantiene la salida legible incluso en archivos de cientos de miles de líneas. |
+| `parser.py` | Analizador léxico-sintáctico completo, con creación dinámica de estructuras y un reporte final en tablas (ver "Visualización en terminal"). Incluye su propia copia del lexer y añade las reglas gramaticales (`archivo`, `linea`, `prefix`, `as_path`, `as_element`, `as_set`, `as_set_list`) usando `ply.yacc`, construyendo así el parser LALR de la gramática definida. Las acciones semánticas también alimentan `records`, `routing_table`, `all_as_numbers` y `as_graph` (ver sección anterior). Reporta errores léxicos, sintácticos y un error semántico (PEER_AS que no aparece como primer elemento del AS_PATH). |
+| `display.py` | Módulo de presentación, independiente del lexer/gramática. Define las funciones de dibujo (`draw_table`, `draw_panel`), la detección de prefijos con más de un AS de origen (`find_conflicting_prefixes`) y el armado del reporte completo (`render_structures_report`), que `parser.py` invoca al final de la ejecución. |
 | `calculadora_analizador_sintactico.py` | Versión de prueba/depuración que valida por partes una línea de forma interactiva (símbolo inicial parcial `linea_inicio`), útil para verificar el reconocimiento incremental de los primeros campos de un registro y la validación del prefijo. |
 | `gramatica.md` | Especificación formal de la gramática (variables, terminales, símbolo inicial y producciones). |
 | `Gramatica_Proyecto_1.pdf` | Documento del enunciado/definición de la gramática del proyecto. |
