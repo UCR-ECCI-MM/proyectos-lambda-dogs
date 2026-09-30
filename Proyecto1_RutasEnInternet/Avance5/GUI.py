@@ -32,3 +32,65 @@ YELLOW = rl.Color(240, 200, 100, 255)
 HEADER = rl.Color(150, 190, 255, 255)
 
 TABS = ["Resumen", "Origen de prefijos", "Aristas de un AS", "Rutas A -> B"]
+
+# Helpers de UI (modo inmediato)
+
+def hover(r):
+    return rl.check_collision_point_rec(rl.get_mouse_position(), r)
+
+
+def clicked(r):
+    return rl.is_mouse_button_pressed(rl.MOUSE_BUTTON_LEFT) and hover(r)
+
+
+def button(x, y, w, h, label):
+    r = rl.Rectangle(x, y, w, h)
+    rl.draw_rectangle_rec(r, BTN_HOT if hover(r) else BTN)
+    tw = rl.measure_text(label, FS)
+    rl.draw_text(label, int(x + (w - tw) / 2), int(y + (h - FS) / 2), FS, TEXT)
+    return clicked(r)
+
+
+class TextBox:
+    def _init_(self, label, digits_only=False):
+        self.label = label
+        self.text = ""
+        self.digits_only = digits_only
+        self.rect = rl.Rectangle(0, 0, 0, 0)
+
+    def type_chars(self):
+        while True:
+            c = rl.get_char_pressed()
+            if c == 0:
+                break
+            ch = chr(c)
+            if c >= 32 and (not self.digits_only or ch.isdigit()):
+                self.text += ch
+        if rl.is_key_pressed(rl.KEY_BACKSPACE) or \
+                rl.is_key_pressed_repeat(rl.KEY_BACKSPACE):
+            self.text = self.text[:-1]
+        if (rl.is_key_down(rl.KEY_LEFT_CONTROL) or
+                rl.is_key_down(rl.KEY_RIGHT_CONTROL)) and \
+                rl.is_key_pressed(rl.KEY_V):
+            clip = rl.get_clipboard_text() or ""
+            clip = clip.strip().replace("\n", "")
+            if self.digits_only:
+                clip = "".join(ch for ch in clip if ch.isdigit())
+            self.text += clip
+
+    def draw(self, x, y, w, h, focused):
+        self.rect = rl.Rectangle(x, y, w, h)
+        rl.draw_rectangle_rec(self.rect, INPUT_BG)
+        rl.draw_rectangle_lines(int(x), int(y), int(w), int(h),
+                                HEADER if focused else DIM)
+        shown = self.text
+        while shown and rl.measure_text(shown, FS) > w - 16:
+            shown = shown[1:] # muestra el final
+        if shown:
+            rl.draw_text(shown, int(x + 8), int(y + (h - FS) / 2), FS, TEXT)
+        else:
+            rl.draw_text(self.label, int(x + 8), int(y + (h - FS) / 2),
+                         FS, DIM)
+        if focused and int(rl.get_time() * 2) % 2 == 0:
+            cx = int(x + 8 + rl.measure_text(shown, FS))
+            rl.draw_rectangle(cx + 1, int(y + 6), 2, int(h - 12), TEXT)
