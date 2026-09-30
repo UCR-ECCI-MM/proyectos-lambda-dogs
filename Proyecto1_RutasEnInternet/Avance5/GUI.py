@@ -94,3 +94,11 @@ class TextBox:
         if focused and int(rl.get_time() * 2) % 2 == 0:
             cx = int(x + 8 + rl.measure_text(shown, FS))
             rl.draw_rectangle(cx + 1, int(y + 6), 2, int(h - 12), TEXT)
+
+@dataclass
+class View:
+    header: list = field(default_factory=list)
+    cols: list = field(default_factory=lambda: [0])
+    rows: list = field(default_factory=list)
+    info: str = ""
+    scroll: int = 0
