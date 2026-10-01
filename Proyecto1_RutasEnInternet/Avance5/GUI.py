@@ -189,4 +189,192 @@ class App:
                   f"(posible prefix hijacking)." if n else
                   "Ningún prefijo tiene orígenes distintos.")
         v.scroll = 0
-        
+
+    def query_edges(self):
+        v = self.views[2]
+        v.header = ["IP del peer (arista)", "Prefijo", "AS path"]
+        v.cols = [0, 210, 400]
+        v.rows, v.scroll = [], 0
+        txt = self.as_box.text.strip()
+        if not txt:
+            v.info = "Escriba un número de AS."
+            return
+        asn = int(txt)
+        data = self.res.index.edges_of(asn)
+        if not data:
+            if asn in self.res.all_as_numbers:
+                v.info = (f"AS{asn} aparece en AS paths pero nunca como "
+                          f"peer: no tiene IPs de arista en el archivo.")
+            else:
+                v.info = f"AS{asn} no aparece en el archivo."
+            return
+        total = 0
+        for ip in sorted(data, key=ip_key):
+            first = True
+            for prefix, path, _line in sorted(data[ip],
+                                              key=lambda t: (t[0], t[2])):
+                v.rows.append(([ip if first else "", prefix, fmt_path(path)],
+                               HEADER if first else TEXT))
+                first = False
+                total += 1
+        v.info = (f"AS{asn}: {len(data)} arista(s), {total} prefijo(s) "
+                  f"conocido(s) a través de ellas.")
+
+    def query_routes(self):
+        v = self.views[3]
+        v.header = ["#", "AS", "Ruta"]
+        v.cols = [0, 70, 130]
+        v.rows, v.scroll = [], 0
+        a, b = self.pa_box.text.strip(), self.pb_box.text.strip()
+        if not a or not b:
+            v.info = "Escriba los dos prefijos (formato del campo 6)."
+            return
+        oa, ob, rutas, trunc = routes_between_prefixes(
+            self.res, a, b, MAX_NODOS_RUTA, MAX_RUTAS)
+        if not oa or not ob:
+            falta = a if not oa else b
+            v.info = f"El prefijo {falta} no existe en el archivo."
+            return
+        for i, r in enumerate(rutas, 1):
+            v.rows.append(([str(i), str(len(r)),
+                            " -> ".join(f"AS{n}" for n in r)], TEXT))
+        o_a = ",".join(f"AS{x}" for x in oa)
+        o_b = ",".join(f"AS{x}" for x in ob)
+        v.info = (f"{a} (origen {o_a})  ->  {b} (origen {o_b}): "
+                  f"{len(rutas)} ruta(s)"
+                  + (f" [límite de {MAX_RUTAS} alcanzado]" if trunc else "")
+                  + f"; máx. {MAX_NODOS_RUTA} AS por ruta."
+                  if rutas else
+                  f"No hay ruta entre {a} y {b} (máx. {MAX_NODOS_RUTA} "
+                  f"AS por ruta).")
+
+    def submit(self):
+        if self.focus is self.path_box:
+            if self.path_box.text.strip():
+                self.request_load(self.path_box.text.strip())
+        elif self.res and self.res.ok:
+            if self.tab == 2:
+                self.query_edges()
+            elif self.tab == 3:
+                self.query_routes()
+
+    # -- frame -------------------------------------------------------------
+    def current_boxes(self):
+        if self.tab == 2:
+            return [self.as_box]
+        if self.tab == 3:
+            return [self.pa_box, self.pb_box]
+        return []
+
+    def frame(self):
+        W, H = rl.get_screen_width(), rl.get_screen_height()
+
+        # teclado
+        self.focus.type_chars()
+        if rl.is_key_pressed(rl.KEY_ENTER) or \
+                rl.is_key_pressed(rl.KEY_KP_ENTER):
+            self.submit()
+        if rl.is_key_pressed(rl.KEY_TAB):
+            boxes = [self.path_box] + self.current_boxes()
+            i = boxes.index(self.focus) if self.focus in boxes else -1
+            self.focus = boxes[(i + 1) % len(boxes)]
+
+        view = self.views[self.tab]
+        area_top = 140 if self.tab in (2, 3) else 96
+        visible = max(1, (H - area_top - 30 - ROW_H) // ROW_H)
+        wheel = rl.get_mouse_wheel_move()
+        if wheel:
+            view.scroll -= int(wheel * 3)
+        if rl.is_key_pressed(rl.KEY_PAGE_DOWN):
+            view.scroll += visible
+        if rl.is_key_pressed(rl.KEY_PAGE_UP):
+            view.scroll -= visible
+        if rl.is_key_pressed(rl.KEY_HOME):
+            view.scroll = 0
+        if rl.is_key_pressed(rl.KEY_END):
+            view.scroll = len(view.rows)
+        view.scroll = max(0, min(view.scroll, max(0, len(view.rows) - visible)))
+
+        rl.begin_drawing()
+        rl.clear_background(BG)
+
+        # barra de archivo
+        self.path_box.draw(10, 10, W - 130, 30, self.focus is self.path_box)
+        if clicked(self.path_box.rect):
+            self.focus = self.path_box
+        if button(W - 110, 10, 100, 30, "Cargar"):
+            self.focus = self.path_box
+            self.submit()
+
+        # pestañas
+        tx = 10
+        for i, name in enumerate(TABS):
+            w = rl.measure_text(name, FS) + 24
+            r = rl.Rectangle(tx, 50, w, 30)
+            rl.draw_rectangle_rec(r, TAB_ON if i == self.tab else TAB_OFF)
+            rl.draw_text(name, int(tx + 12), 56, FS, TEXT)
+            if clicked(r):
+                self.tab = i
+                self.focus = (self.current_boxes() or [self.path_box])[0] \
+                    if i in (2, 3) else self.focus
+            tx += w + 4
+
+        # consultas
+        usable = self.res is not None and self.res.ok
+        if self.tab in (2, 3):
+            if self.tab == 2:
+                self.as_box.draw(10, 90, 220, 30, self.focus is self.as_box)
+                bx = 240
+            else:
+                half = (W - 140) // 2
+                self.pa_box.draw(10, 90, half - 10, 30,
+                                 self.focus is self.pa_box)
+                self.pb_box.draw(half + 5, 90, half - 10, 30,
+                                 self.focus is self.pb_box)
+                bx = W - 125
+            for bxo in self.current_boxes():
+                if clicked(bxo.rect):
+                    self.focus = bxo
+            if button(bx, 90, 110, 30, "Buscar") and usable:
+                self.submit()
+            if not usable:
+                rl.draw_text("Los análisis requieren un archivo sin errores.",
+                             10, 124, FS - 2, YELLOW)
+
+        # tabla / lista
+        top = area_top
+        if view.info and self.tab != 0:
+            rl.draw_text(view.info, 10, top - 4 if self.tab in (2, 3) else
+                         top - 12, FS - 2, HEADER)
+        top += 22 if self.tab != 0 else 0
+        rl.draw_rectangle(0, top, W, H - top - 28, PANEL)
+        y = top + 4
+        if view.header:
+            for x, h in zip(view.cols, view.header):
+                rl.draw_text(h, 10 + x, y, FS, HEADER)
+            y += ROW_H
+            rl.draw_line(0, y - 2, W, y - 2, DIM)
+        rl.begin_scissor_mode(0, y, W, H - y - 28)
+        for i in range(view.scroll, min(len(view.rows), view.scroll + visible
+                                        + 1)):
+            cells, color = view.rows[i]
+            for x, c in zip(view.cols, cells):
+                if c:
+                    rl.draw_text(c, 10 + x, y, FS, color)
+            y += ROW_H
+        rl.end_scissor_mode()
+        if not view.rows and self.tab != 0:
+            rl.draw_text("Sin resultados todavía.", 10, top + 30, FS, DIM)
+
+        # barra de estado
+        rl.draw_rectangle(0, H - 28, W, 28, TAB_OFF)
+        rl.draw_text(self.status, 10, H - 24, FS - 2, TEXT)
+        if len(view.rows) > visible:
+            pos = f"{view.scroll + 1}-{min(len(view.rows), view.scroll + visible)}/{len(view.rows)}"
+            rl.draw_text(pos, W - rl.measure_text(pos, FS - 2) - 10, H - 24,
+                         FS - 2, DIM)
+        rl.end_drawing()
+
+        if self.pending:
+            p, self.pending = self.pending, None
+            self.do_load(p)
