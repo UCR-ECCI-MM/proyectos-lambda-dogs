@@ -102,3 +102,43 @@ class View:
     rows: list = field(default_factory=list)
     info: str = ""
     scroll: int = 0
+
+# Aplicación
+
+class App:
+    def _init_(self):
+        self.res = None
+        self.tab = 0
+        self.views = [View() for _ in TABS]
+        self.path_box = TextBox("Ruta del archivo MRT (o arrastre uno aquí)")
+        self.as_box = TextBox("Número de AS", digits_only=True)
+        self.pa_box = TextBox("Prefijo A (ej. 8.8.8.0/24)")
+        self.pb_box = TextBox("Prefijo B (ej. 1.1.1.0/24)")
+        self.focus = self.path_box
+        self.status = "Cargue un archivo MRT."
+        self.pending = None
+        self.views[0].rows = [(["Cargue un archivo MRT para comenzar."], DIM)]
+
+    # -- carga -----------------------------------------------------------
+    def request_load(self, path):
+        self.path_box.text = path
+        self.status = f"Analizando {path} ..."
+        self.pending = path
+
+    def do_load(self, path):
+        res = parse_file(path)
+        self.res = res
+        self.views[1] = View()
+        self.views[2] = View()
+        self.views[3] = View()
+        self.build_summary()
+        if res.ok:
+            self.build_conflicts()
+            self.status = (f"OK: {len(res.records)} registros, "
+                           f"{len(res.index.conflicts)} prefijo(s) con "
+                           f"más de un origen.")
+            self.tab = 1 if res.index.conflicts else 0
+        else:
+            self.status = (f"El archivo tiene {len(res.colector.errores)} "
+                           f"error(es); corríjalos para usar los análisis.")
+            self.tab = 0
