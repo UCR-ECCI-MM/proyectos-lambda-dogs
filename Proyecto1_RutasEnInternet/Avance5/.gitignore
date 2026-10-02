@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.DS_Store
+parsetab.py
+parser.out
+ParserOutput.txt
+TokenOutput.txt
+# archivo de ejemplo grande: no subirlo al repo
+prueba
