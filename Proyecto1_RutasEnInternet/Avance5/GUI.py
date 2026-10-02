@@ -378,3 +378,20 @@ class App:
         if self.pending:
             p, self.pending = self.pending, None
             self.do_load(p)
+
+def main():
+    rl.set_config_flags(rl.FLAG_WINDOW_RESIZABLE)
+    rl.init_window(1150, 700, "Analizador MRT")
+    rl.set_window_min_size(800, 500)
+    rl.set_exit_key(rl.KEY_NULL)
+    rl.set_target_fps(60)
+    app = App()
+    if len(sys.argv) > 1:
+        app.request_load(sys.argv[1])
+    while not rl.window_should_close():
+        app.frame()
+    rl.close_window()
+
+
+if __name__ == "__main__":
+    main()
