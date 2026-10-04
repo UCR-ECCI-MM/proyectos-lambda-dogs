@@ -158,3 +158,43 @@ def routes_between_prefixes(res, prefix_a, prefix_b, max_nodes=12,
             truncado = truncado or t
     rutas.sort(key=lambda p: (len(p), p))
     return oa, ob, rutas, truncado
+
+
+# ---------------------------------------------------------------------------
+# Ayudas para la entrada del usuario y el formato (las usan la consola y la GUI)
+# ---------------------------------------------------------------------------
+
+import re
+
+_PREFIJO_RE = re.compile(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})$')
+
+
+def normalizar_prefijo(txt):
+    """'8.8.8.0/24' (campo 6) -> prefijo canónico, o None si no tiene esa forma."""
+    m = _PREFIJO_RE.match((txt or '').strip())
+    if not m:
+        return None
+    *octetos, mask = (int(g) for g in m.groups())
+    if any(o > 255 for o in octetos) or mask > 32:
+        return None
+    return '.'.join(str(o) for o in octetos) + f'/{mask}'
+
+
+def fmt_ruta(ruta):
+    """[7018, 3257, 64512] -> '7018 -> 3257 -> 64512'"""
+    return ' -> '.join(str(n) for n in ruta)
+
+
+def filas_aristas(index, asn):
+    """Consulta 2 lista para mostrar: [(ip, prefijo, 'as path', línea)] con las
+    IP en orden numérico y los prefijos en orden. [] si el AS no es peer."""
+    aristas = index.edges_of(asn)
+    if not aristas:
+        return []
+    filas = []
+    for ip in sorted(aristas, key=ip_key):
+        for prefijo, path, linea in sorted(
+                aristas[ip], key=lambda t: (ip_key(t[0].split('/')[0]),
+                                            int(t[0].split('/')[1]), t[2])):
+            filas.append((ip, prefijo, fmt_path(path), linea))
+    return filas

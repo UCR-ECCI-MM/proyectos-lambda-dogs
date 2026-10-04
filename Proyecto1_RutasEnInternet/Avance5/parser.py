@@ -24,6 +24,7 @@ import ply.yacc as yacc
 
 from lexer import tokens, lexer as _ply_lexer, MRTLexer, FIELDS   # noqa: F401
 from errores import Colector, LEXICO, SINTACTICO, SEMANTICO, ARCHIVO
+from analysis import Indices
 from display import (C, strip_ansi, render_structures_report,
                       render_problemas)
 
@@ -98,6 +99,8 @@ class ParseResult:
     as_graph: ASGraph = field(default_factory=ASGraph)
     colector: Colector = field(default_factory=Colector)
     total_lines: int = 0
+    # Índices para las funcionalidades 1-3 (se llenan en p_linea)
+    index: Indices = field(default_factory=Indices)
 
     @property
     def ok(self):
@@ -225,9 +228,11 @@ def p_linea(p):
     _res.all_as_numbers.update(as_numbers)                       # set
     _res.all_as_numbers.add(peer_as)
     for left, right in zip(as_numbers, as_numbers[1:]):          # grafo
-        _res.as_graph.add_edge(left, right)
+        if left != right:          # AS prepending (3356 3356): sin auto-arista
+            _res.as_graph.add_edge(left, right)
     if as_numbers:
         _res.as_graph.add_node(as_numbers[0])
+    _res.index.add(prefix_txt, peer_as, p[7], as_path, line)    # índices 1-3
 
     p[0] = record
 
