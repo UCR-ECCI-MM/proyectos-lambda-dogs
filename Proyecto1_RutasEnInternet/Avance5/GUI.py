@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import pyray as rl
 
 from parser import parse_file
-from Analisis import fmt_path, ip_key, routes_between_prefixes
+from analysis import fmt_path, ip_key, routes_between_prefixes
 from display import strip_ansi, render_problemas
 
 MAX_NODOS_RUTA = 12
@@ -33,8 +33,6 @@ HEADER = rl.Color(150, 190, 255, 255)
 
 TABS = ["Resumen", "Origen de prefijos", "Aristas de un AS", "Rutas A -> B"]
 
-# Helpers de UI (modo inmediato)
-
 def hover(r):
     return rl.check_collision_point_rec(rl.get_mouse_position(), r)
 
@@ -52,7 +50,7 @@ def button(x, y, w, h, label):
 
 
 class TextBox:
-    def _init_(self, label, digits_only=False):
+    def __init__(self, label, digits_only=False):
         self.label = label
         self.text = ""
         self.digits_only = digits_only
@@ -85,7 +83,7 @@ class TextBox:
                                 HEADER if focused else DIM)
         shown = self.text
         while shown and rl.measure_text(shown, FS) > w - 16:
-            shown = shown[1:] # muestra el final
+            shown = shown[1:]
         if shown:
             rl.draw_text(shown, int(x + 8), int(y + (h - FS) / 2), FS, TEXT)
         else:
@@ -103,10 +101,8 @@ class View:
     info: str = ""
     scroll: int = 0
 
-# Aplicación
-
 class App:
-    def _init_(self):
+    def __init__(self):
         self.res = None
         self.tab = 0
         self.views = [View() for _ in TABS]
@@ -142,7 +138,7 @@ class App:
             self.status = (f"El archivo tiene {len(res.colector.errores)} "
                            f"error(es); corríjalos para usar los análisis.")
             self.tab = 0
-# -- construcción de vistas ------------------------------------------
+
     def build_summary(self):
         res, v = self.res, self.views[0]
         rows = []
