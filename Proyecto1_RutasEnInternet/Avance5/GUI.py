@@ -102,3 +102,91 @@ class View:
     rows: list = field(default_factory=list)
     info: str = ""
     scroll: int = 0
+
+# Aplicación
+
+class App:
+    def _init_(self):
+        self.res = None
+        self.tab = 0
+        self.views = [View() for _ in TABS]
+        self.path_box = TextBox("Ruta del archivo MRT (o arrastre uno aquí)")
+        self.as_box = TextBox("Número de AS", digits_only=True)
+        self.pa_box = TextBox("Prefijo A (ej. 8.8.8.0/24)")
+        self.pb_box = TextBox("Prefijo B (ej. 1.1.1.0/24)")
+        self.focus = self.path_box
+        self.status = "Cargue un archivo MRT."
+        self.pending = None
+        self.views[0].rows = [(["Cargue un archivo MRT para comenzar."], DIM)]
+
+    # -- carga -----------------------------------------------------------
+    def request_load(self, path):
+        self.path_box.text = path
+        self.status = f"Analizando {path} ..."
+        self.pending = path
+
+    def do_load(self, path):
+        res = parse_file(path)
+        self.res = res
+        self.views[1] = View()
+        self.views[2] = View()
+        self.views[3] = View()
+        self.build_summary()
+        if res.ok:
+            self.build_conflicts()
+            self.status = (f"OK: {len(res.records)} registros, "
+                           f"{len(res.index.conflicts)} prefijo(s) con "
+                           f"más de un origen.")
+            self.tab = 1 if res.index.conflicts else 0
+        else:
+            self.status = (f"El archivo tiene {len(res.colector.errores)} "
+                           f"error(es); corríjalos para usar los análisis.")
+            self.tab = 0
+# -- construcción de vistas ------------------------------------------
+    def build_summary(self):
+        res, v = self.res, self.views[0]
+        rows = []
+        col = res.colector
+        if res.ok:
+            rows.append((["Archivo analizado sin errores."], GREEN))
+        else:
+            rows.append((["Archivo con errores (no se habilitan los "
+                          "análisis)."], RED))
+        rows.append(([f"Líneas: {res.total_lines}    "
+                      f"Registros válidos: {len(res.records)}    "
+                      f"Errores: {len(col.errores)}"], TEXT))
+        if res.ok:
+            rows.append(([f"Prefijos distintos: {len(res.routing_table)}    "
+                          f"AS distintos: {len(res.all_as_numbers)}    "
+                          f"Aristas AS-AS: {len(res.as_graph.edges())}"],
+                         TEXT))
+        rows.append(([""], TEXT))
+        for ln in render_problemas(col):
+            s = strip_ansi(ln)
+            rows.append(([s], YELLOW if s.lstrip().startswith("!") else RED))
+        v.rows, v.scroll = rows, 0
+
+    def build_conflicts(self):
+        idx, v = self.res.index, self.views[1]
+        v.header = ["Prefijo", "AS origen", "Rutas", "Líneas",
+                    "Ejemplo de AS path"]
+        v.cols = [0, 170, 280, 350, 520]
+        v.rows = []
+        for prefix, por_origen in idx.conflict_rows():
+            first = True
+            for origen in sorted(por_origen):
+                regs = por_origen[origen]
+                lineas = ",".join(str(l) for l, _ in regs[:4])
+                if len(regs) > 4:
+                    lineas += ",..."
+                v.rows.append(([prefix if first else "", f"AS{origen}",
+                                str(len(regs)), lineas,
+                                fmt_path(regs[0][1])],
+                               RED if first else YELLOW))
+                first = False
+        n = len(idx.conflicts)
+        v.info = (f"{n} prefijo(s) reportado(s) con más de un AS origen "
+                  f"(posible prefix hijacking)." if n else
+                  "Ningún prefijo tiene orígenes distintos.")
+        v.scroll = 0
+        
