@@ -1,5 +1,12 @@
 """
 GUI Raylib para el analizador MRT.
+
+    pip install raylib
+    python GUI.py [archivo.txt]
+
+Pestañas: Resumen | Origen de prefijos (func. 1) | Aristas de un AS (func. 2)
+          | Rutas A -> B (func. 3)
+Se puede arrastrar un archivo a la ventana, o escribir la ruta y dar Enter.
 """
 
 import sys
@@ -8,14 +15,16 @@ from dataclasses import dataclass, field
 import pyray as rl
 
 from parser import parse_file
-from analysis import fmt_path, ip_key, routes_between_prefixes
-from display import strip_ansi, render_problemas
+from analysis import (fmt_path, fmt_ruta, filas_aristas, normalizar_prefijo,
+                      routes_between_prefixes)
 
 MAX_NODOS_RUTA = 12
 MAX_RUTAS = 1000
+MAX_PROBLEMAS = 300
 
 FS = 18
 ROW_H = 22
+PAD = 20
 
 BG = rl.Color(30, 32, 38, 255)
 PANEL = rl.Color(40, 43, 51, 255)
@@ -33,6 +42,17 @@ HEADER = rl.Color(150, 190, 255, 255)
 
 TABS = ["Resumen", "Origen de prefijos", "Aristas de un AS", "Rutas A -> B"]
 
+
+def safe(s):
+    """La fuente por defecto de raylib solo dibuja Latin-1: lo demás -> ASCII."""
+    cambios = {'→': '->', '✗': 'x', '✓': 'v', '⚠': '!', '…': '...'}
+    return ''.join(cambios.get(ch, ch if ord(ch) < 256 else '?') for ch in s)
+
+
+# ---------------------------------------------------------------------------
+# Helpers de UI (modo inmediato)
+# ---------------------------------------------------------------------------
+
 def hover(r):
     return rl.check_collision_point_rec(rl.get_mouse_position(), r)
 
@@ -47,6 +67,15 @@ def button(x, y, w, h, label):
     tw = rl.measure_text(label, FS)
     rl.draw_text(label, int(x + (w - tw) / 2), int(y + (h - FS) / 2), FS, TEXT)
     return clicked(r)
+
+
+def recortar(texto, ancho):
+    """Corta el texto (con '...') para que quepa en `ancho` píxeles."""
+    if rl.measure_text(texto, FS) <= ancho:
+        return texto
+    while texto and rl.measure_text(texto + "...", FS) > ancho:
+        texto = texto[:-1]
+    return texto + "..."
 
 
 class TextBox:
@@ -68,9 +97,12 @@ class TextBox:
                 rl.is_key_pressed_repeat(rl.KEY_BACKSPACE):
             self.text = self.text[:-1]
         if (rl.is_key_down(rl.KEY_LEFT_CONTROL) or
-                rl.is_key_down(rl.KEY_RIGHT_CONTROL)) and \
+                rl.is_key_down(rl.KEY_RIGHT_CONTROL) or
+                rl.is_key_down(rl.KEY_LEFT_SUPER)) and \
                 rl.is_key_pressed(rl.KEY_V):
             clip = rl.get_clipboard_text() or ""
+            if isinstance(clip, bytes):
+                clip = clip.decode("utf-8", "replace")
             clip = clip.strip().replace("\n", "")
             if self.digits_only:
                 clip = "".join(ch for ch in clip if ch.isdigit())
@@ -81,9 +113,9 @@ class TextBox:
         rl.draw_rectangle_rec(self.rect, INPUT_BG)
         rl.draw_rectangle_lines(int(x), int(y), int(w), int(h),
                                 HEADER if focused else DIM)
-        shown = self.text
+        shown = safe(self.text)
         while shown and rl.measure_text(shown, FS) > w - 16:
-            shown = shown[1:]
+            shown = shown[1:]  # muestra el final
         if shown:
             rl.draw_text(shown, int(x + 8), int(y + (h - FS) / 2), FS, TEXT)
         else:
@@ -93,13 +125,19 @@ class TextBox:
             cx = int(x + 8 + rl.measure_text(shown, FS))
             rl.draw_rectangle(cx + 1, int(y + 6), 2, int(h - 12), TEXT)
 
+
 @dataclass
 class View:
     header: list = field(default_factory=list)
     cols: list = field(default_factory=lambda: [0])
-    rows: list = field(default_factory=list)
+    rows: list = field(default_factory=list)   # [([celdas], color)]
     info: str = ""
     scroll: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Aplicación
+# ---------------------------------------------------------------------------
 
 class App:
     def __init__(self):
@@ -130,6 +168,8 @@ class App:
         self.build_summary()
         if res.ok:
             self.build_conflicts()
+            self.views[2].info = "Escriba un número de AS y pulse Consultar."
+            self.views[3].info = "Escriba los prefijos A y B y pulse Consultar."
             self.status = (f"OK: {len(res.records)} registros, "
                            f"{len(res.index.conflicts)} prefijo(s) con "
                            f"más de un origen.")
@@ -139,6 +179,7 @@ class App:
                            f"error(es); corríjalos para usar los análisis.")
             self.tab = 0
 
+    # -- construcción de vistas ------------------------------------------
     def build_summary(self):
         res, v = self.res, self.views[0]
         rows = []
@@ -150,16 +191,28 @@ class App:
                           "análisis)."], RED))
         rows.append(([f"Líneas: {res.total_lines}    "
                       f"Registros válidos: {len(res.records)}    "
-                      f"Errores: {len(col.errores)}"], TEXT))
+                      f"Errores: {len(col.errores)}    "
+                      f"Advertencias: {len(col.advertencias)}"], TEXT))
         if res.ok:
             rows.append(([f"Prefijos distintos: {len(res.routing_table)}    "
                           f"AS distintos: {len(res.all_as_numbers)}    "
                           f"Aristas AS-AS: {len(res.as_graph.edges())}"],
                          TEXT))
         rows.append(([""], TEXT))
-        for ln in render_problemas(col):
-            s = strip_ansi(ln)
-            rows.append(([s], YELLOW if s.lstrip().startswith("!") else RED))
+        problemas = list(col.errores) + list(col.advertencias)
+        for p in problemas[:MAX_PROBLEMAS]:
+            es_error = p in col.errores
+            partes = [f"Línea {p.linea}" if p.linea else "Archivo",
+                      p.tipo if es_error else f"advertencia {p.tipo}"]
+            if p.campo:
+                partes.append(f"campo {p.campo}")
+            txt = " | ".join(partes)
+            if p.lexema:
+                txt += f" | '{p.lexema}'"
+            txt += f": {p.mensaje}"
+            rows.append(([txt], RED if es_error else YELLOW))
+        if len(problemas) > MAX_PROBLEMAS:
+            rows.append(([f"... y {len(problemas) - MAX_PROBLEMAS} más"], DIM))
         v.rows, v.scroll = rows, 0
 
     def build_conflicts(self):
@@ -186,206 +239,214 @@ class App:
                   "Ningún prefijo tiene orígenes distintos.")
         v.scroll = 0
 
-    def query_edges(self):
-        v = self.views[2]
-        v.header = ["IP del peer (arista)", "Prefijo", "AS path"]
-        v.cols = [0, 210, 400]
-        v.rows, v.scroll = [], 0
+    def build_aristas(self):
+        v = self.views[2] = View()
         txt = self.as_box.text.strip()
         if not txt:
             v.info = "Escriba un número de AS."
             return
         asn = int(txt)
-        data = self.res.index.edges_of(asn)
-        if not data:
+        filas = filas_aristas(self.res.index, asn)
+        if not filas:
+            v.info = (f"El AS {asn} no aparece como peer (campo 5) en el "
+                      f"archivo, así que no tiene aristas propias.")
             if asn in self.res.all_as_numbers:
-                v.info = (f"AS{asn} aparece en AS paths pero nunca como "
-                          f"peer: no tiene IPs de arista en el archivo.")
-            else:
-                v.info = f"AS{asn} no aparece en el archivo."
+                v.info += " (Sí aparece dentro de algunos AS paths.)"
             return
-        total = 0
-        for ip in sorted(data, key=ip_key):
-            first = True
-            for prefix, path, _line in sorted(data[ip],
-                                              key=lambda t: (t[0], t[2])):
-                v.rows.append(([ip if first else "", prefix, fmt_path(path)],
-                               HEADER if first else TEXT))
-                first = False
-                total += 1
-        v.info = (f"AS{asn}: {len(data)} arista(s), {total} prefijo(s) "
-                  f"conocido(s) a través de ellas.")
+        v.header = ["Arista (IP del peer)", "Prefijo", "AS path", "Línea"]
+        v.cols = [0, 210, 380, 900]
+        ips = set()
+        ip_actual = None
+        for ip, prefijo, path, linea in filas:
+            nuevo = ip != ip_actual
+            ip_actual = ip
+            ips.add(ip)
+            v.rows.append(([ip if nuevo else "", prefijo, path, str(linea)],
+                           HEADER if nuevo else TEXT))
+        v.info = (f"AS {asn}: {len(ips)} arista(s), {len(filas)} "
+                  f"prefijo(s)/ruta(s) conocidos a través de ellas.")
 
-    def query_routes(self):
-        v = self.views[3]
-        v.header = ["#", "AS", "Ruta"]
-        v.cols = [0, 70, 130]
-        v.rows, v.scroll = [], 0
-        a, b = self.pa_box.text.strip(), self.pb_box.text.strip()
-        if not a or not b:
-            v.info = "Escriba los dos prefijos (formato del campo 6)."
+    def build_rutas(self):
+        v = self.views[3] = View()
+        a = normalizar_prefijo(self.pa_box.text)
+        b = normalizar_prefijo(self.pb_box.text)
+        if a is None or b is None:
+            v.info = ("Los prefijos deben escribirse como en el campo 6, "
+                      "por ejemplo 8.8.8.0/24.")
             return
-        oa, ob, rutas, trunc = routes_between_prefixes(
+        idx = self.res.index
+        faltan = [p for p in (a, b) if not idx.origins_for(p)]
+        if faltan:
+            v.info = "El prefijo " + " y ".join(faltan) + \
+                     " no existe en el archivo."
+            return
+        oa, ob, rutas, truncado = routes_between_prefixes(
             self.res, a, b, MAX_NODOS_RUTA, MAX_RUTAS)
-        if not oa or not ob:
-            falta = a if not oa else b
-            v.info = f"El prefijo {falta} no existe en el archivo."
+        origen_a = ", ".join(f"AS{x}" for x in oa)
+        origen_b = ", ".join(f"AS{x}" for x in ob)
+        if not rutas:
+            v.info = (f"No hay rutas entre {a} ({origen_a}) y {b} "
+                      f"({origen_b}) con a lo sumo {MAX_NODOS_RUTA} AS.")
             return
+        v.header = ["#", "AS", "Ruta"]
+        v.cols = [0, 70, 140]
         for i, r in enumerate(rutas, 1):
-            v.rows.append(([str(i), str(len(r)),
-                            " -> ".join(f"AS{n}" for n in r)], TEXT))
-        o_a = ",".join(f"AS{x}" for x in oa)
-        o_b = ",".join(f"AS{x}" for x in ob)
-        v.info = (f"{a} (origen {o_a})  ->  {b} (origen {o_b}): "
-                  f"{len(rutas)} ruta(s)"
-                  + (f" [límite de {MAX_RUTAS} alcanzado]" if trunc else "")
-                  + f"; máx. {MAX_NODOS_RUTA} AS por ruta."
-                  if rutas else
-                  f"No hay ruta entre {a} y {b} (máx. {MAX_NODOS_RUTA} "
-                  f"AS por ruta).")
+            v.rows.append(([str(i), str(len(r)), fmt_ruta(r)], TEXT))
+        v.info = (f"{len(rutas)} ruta(s) de {a} ({origen_a}) a {b} "
+                  f"({origen_b}), sin repetir AS, máx. {MAX_NODOS_RUTA} AS."
+                  + (f" Se muestran solo las primeras {MAX_RUTAS}."
+                     if truncado else ""))
 
-    def submit(self):
-        if self.focus is self.path_box:
-            if self.path_box.text.strip():
-                self.request_load(self.path_box.text.strip())
-        elif self.res and self.res.ok:
-            if self.tab == 2:
-                self.query_edges()
-            elif self.tab == 3:
-                self.query_routes()
+    # -- consultas -------------------------------------------------------
+    def consultar(self):
+        if not (self.res and self.res.ok):
+            self.status = "Cargue primero un archivo sin errores."
+            return
+        if self.tab == 2:
+            self.build_aristas()
+        elif self.tab == 3:
+            self.build_rutas()
 
-    # -- frame -------------------------------------------------------------
-    def current_boxes(self):
+    # -- entrada ---------------------------------------------------------
+    def inputs_de_tab(self):
         if self.tab == 2:
             return [self.as_box]
         if self.tab == 3:
             return [self.pa_box, self.pb_box]
         return []
 
-    def frame(self):
-        W, H = rl.get_screen_width(), rl.get_screen_height()
+    def update(self):
+        # arrastrar y soltar
+        try:
+            if rl.is_file_dropped():
+                files = rl.load_dropped_files()
+                if files.count > 0:
+                    p = files.paths[0]
+                    if not isinstance(p, str):
+                        p = rl.ffi.string(p).decode("utf-8", "replace")
+                    self.request_load(p)
+                rl.unload_dropped_files(files)
+        except Exception:
+            pass
 
-        # teclado
+        # foco con clic
+        for box in [self.path_box] + self.inputs_de_tab():
+            if clicked(box.rect):
+                self.focus = box
+        if self.focus not in [self.path_box] + self.inputs_de_tab():
+            self.focus = self.path_box
+
         self.focus.type_chars()
+        if rl.is_key_pressed(rl.KEY_TAB):
+            cajas = [self.path_box] + self.inputs_de_tab()
+            self.focus = cajas[(cajas.index(self.focus) + 1) % len(cajas)]
         if rl.is_key_pressed(rl.KEY_ENTER) or \
                 rl.is_key_pressed(rl.KEY_KP_ENTER):
-            self.submit()
-        if rl.is_key_pressed(rl.KEY_TAB):
-            boxes = [self.path_box] + self.current_boxes()
-            i = boxes.index(self.focus) if self.focus in boxes else -1
-            self.focus = boxes[(i + 1) % len(boxes)]
+            if self.focus is self.path_box:
+                self.request_load(self.path_box.text.strip())
+            else:
+                self.consultar()
 
-        view = self.views[self.tab]
-        area_top = 140 if self.tab in (2, 3) else 96
-        visible = max(1, (H - area_top - 30 - ROW_H) // ROW_H)
-        wheel = rl.get_mouse_wheel_move()
-        if wheel:
-            view.scroll -= int(wheel * 3)
+        # scroll de la vista
+        v = self.views[self.tab]
+        v.scroll -= int(rl.get_mouse_wheel_move() * 3)
         if rl.is_key_pressed(rl.KEY_PAGE_DOWN):
-            view.scroll += visible
+            v.scroll += 15
         if rl.is_key_pressed(rl.KEY_PAGE_UP):
-            view.scroll -= visible
-        if rl.is_key_pressed(rl.KEY_HOME):
-            view.scroll = 0
-        if rl.is_key_pressed(rl.KEY_END):
-            view.scroll = len(view.rows)
-        view.scroll = max(0, min(view.scroll, max(0, len(view.rows) - visible)))
+            v.scroll -= 15
+        if rl.is_key_pressed(rl.KEY_DOWN) or rl.is_key_pressed_repeat(rl.KEY_DOWN):
+            v.scroll += 1
+        if rl.is_key_pressed(rl.KEY_UP) or rl.is_key_pressed_repeat(rl.KEY_UP):
+            v.scroll -= 1
 
-        rl.begin_drawing()
+    # -- dibujo ----------------------------------------------------------
+    def draw(self):
+        W, H = rl.get_screen_width(), rl.get_screen_height()
         rl.clear_background(BG)
 
         # barra de archivo
-        self.path_box.draw(10, 10, W - 130, 30, self.focus is self.path_box)
-        if clicked(self.path_box.rect):
-            self.focus = self.path_box
-        if button(W - 110, 10, 100, 30, "Cargar"):
-            self.focus = self.path_box
-            self.submit()
+        self.path_box.draw(PAD, 15, W - 2 * PAD - 150, 34,
+                           self.focus is self.path_box)
+        if button(W - PAD - 140, 15, 140, 34, "Cargar"):
+            self.request_load(self.path_box.text.strip())
 
         # pestañas
-        tx = 10
-        for i, name in enumerate(TABS):
-            w = rl.measure_text(name, FS) + 24
-            r = rl.Rectangle(tx, 50, w, 30)
+        tw = (W - 2 * PAD) // len(TABS)
+        for i, nombre in enumerate(TABS):
+            r = rl.Rectangle(PAD + i * tw, 60, tw - 4, 32)
             rl.draw_rectangle_rec(r, TAB_ON if i == self.tab else TAB_OFF)
-            rl.draw_text(name, int(tx + 12), 56, FS, TEXT)
+            lw = rl.measure_text(nombre, FS)
+            rl.draw_text(nombre, int(r.x + (r.width - lw) / 2), 67, FS, TEXT)
             if clicked(r):
                 self.tab = i
-                self.focus = (self.current_boxes() or [self.path_box])[0] \
-                    if i in (2, 3) else self.focus
-            tx += w + 4
 
-        # consultas
-        usable = self.res is not None and self.res.ok
-        if self.tab in (2, 3):
-            if self.tab == 2:
-                self.as_box.draw(10, 90, 220, 30, self.focus is self.as_box)
-                bx = 240
-            else:
-                half = (W - 140) // 2
-                self.pa_box.draw(10, 90, half - 10, 30,
-                                 self.focus is self.pa_box)
-                self.pb_box.draw(half + 5, 90, half - 10, 30,
-                                 self.focus is self.pb_box)
-                bx = W - 125
-            for bxo in self.current_boxes():
-                if clicked(bxo.rect):
-                    self.focus = bxo
-            if button(bx, 90, 110, 30, "Buscar") and usable:
-                self.submit()
-            if not usable:
-                rl.draw_text("Los análisis requieren un archivo sin errores.",
-                             10, 124, FS - 2, YELLOW)
+        # entradas propias de la pestaña
+        y = 102
+        if self.tab == 2:
+            self.as_box.draw(PAD, y, 300, 34, self.focus is self.as_box)
+            if button(PAD + 312, y, 140, 34, "Consultar"):
+                self.consultar()
+            y += 46
+        elif self.tab == 3:
+            w = (W - 2 * PAD - 160) // 2
+            self.pa_box.draw(PAD, y, w, 34, self.focus is self.pa_box)
+            self.pb_box.draw(PAD + w + 8, y, w, 34, self.focus is self.pb_box)
+            if button(W - PAD - 140, y, 140, 34, "Consultar"):
+                self.consultar()
+            y += 46
 
-        # tabla / lista
-        top = area_top
-        if view.info and self.tab != 0:
-            rl.draw_text(view.info, 10, top - 4 if self.tab in (2, 3) else
-                         top - 12, FS - 2, HEADER)
-        top += 22 if self.tab != 0 else 0
-        rl.draw_rectangle(0, top, W, H - top - 28, PANEL)
-        y = top + 4
-        if view.header:
-            for x, h in zip(view.cols, view.header):
-                rl.draw_text(h, 10 + x, y, FS, HEADER)
-            y += ROW_H
-            rl.draw_line(0, y - 2, W, y - 2, DIM)
-        rl.begin_scissor_mode(0, y, W, H - y - 28)
-        for i in range(view.scroll, min(len(view.rows), view.scroll + visible
-                                        + 1)):
-            cells, color = view.rows[i]
-            for x, c in zip(view.cols, cells):
-                if c:
-                    rl.draw_text(c, 10 + x, y, FS, color)
-            y += ROW_H
-        rl.end_scissor_mode()
-        if not view.rows and self.tab != 0:
-            rl.draw_text("Sin resultados todavía.", 10, top + 30, FS, DIM)
+        # panel de resultados
+        v = self.views[self.tab]
+        bottom = H - 36
+        rl.draw_rectangle(PAD, y, W - 2 * PAD, bottom - y, PANEL)
+        cy = y + 6
+        if v.info:
+            rl.draw_text(recortar(safe(v.info), W - 2 * PAD - 16),
+                         PAD + 8, cy, FS, DIM)
+            cy += ROW_H + 4
+        if v.header:
+            for c, h in zip(v.cols, v.header):
+                rl.draw_text(safe(h), PAD + 8 + c, cy, FS, HEADER)
+            cy += ROW_H + 2
+            rl.draw_line(PAD + 8, cy - 2, W - PAD - 8, cy - 2, DIM)
+        visibles = max(1, int((bottom - cy - 4) // ROW_H))
+        v.scroll = max(0, min(v.scroll, max(0, len(v.rows) - visibles)))
+        for i in range(v.scroll, min(len(v.rows), v.scroll + visibles)):
+            celdas, color = v.rows[i]
+            for j, celda in enumerate(celdas):
+                x = PAD + 8 + v.cols[min(j, len(v.cols) - 1)]
+                if j + 1 < len(v.cols):
+                    ancho = v.cols[j + 1] - v.cols[j] - 10
+                else:
+                    ancho = W - PAD - 8 - x
+                rl.draw_text(recortar(safe(celda), ancho), x, cy, FS, color)
+            cy += ROW_H
+        if len(v.rows) > visibles:
+            rl.draw_text(f"{v.scroll + 1}-{min(len(v.rows), v.scroll + visibles)}"
+                         f" de {len(v.rows)}", W - PAD - 130, y + 6, FS - 2, DIM)
 
         # barra de estado
-        rl.draw_rectangle(0, H - 28, W, 28, TAB_OFF)
-        rl.draw_text(self.status, 10, H - 24, FS - 2, TEXT)
-        if len(view.rows) > visible:
-            pos = f"{view.scroll + 1}-{min(len(view.rows), view.scroll + visible)}/{len(view.rows)}"
-            rl.draw_text(pos, W - rl.measure_text(pos, FS - 2) - 10, H - 24,
-                         FS - 2, DIM)
-        rl.end_drawing()
+        rl.draw_text(recortar(safe(self.status), W - 2 * PAD), PAD, H - 28,
+                     FS, DIM)
 
-        if self.pending:
-            p, self.pending = self.pending, None
-            self.do_load(p)
 
-def main():
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
     rl.set_config_flags(rl.FLAG_WINDOW_RESIZABLE)
-    rl.init_window(1150, 700, "Analizador MRT")
+    rl.init_window(1100, 700, "Analizador MRT - Rutas en Internet")
     rl.set_window_min_size(800, 500)
-    rl.set_exit_key(rl.KEY_NULL)
     rl.set_target_fps(60)
     app = App()
-    if len(sys.argv) > 1:
-        app.request_load(sys.argv[1])
+    if argv:
+        app.request_load(argv[0])
     while not rl.window_should_close():
-        app.frame()
+        if app.pending is not None:      # se dibuja "Analizando..." primero
+            path, app.pending = app.pending, None
+            app.do_load(path)
+        app.update()
+        rl.begin_drawing()
+        app.draw()
+        rl.end_drawing()
     rl.close_window()
 
 
