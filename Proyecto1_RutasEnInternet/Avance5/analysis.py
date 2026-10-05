@@ -198,3 +198,65 @@ def filas_aristas(index, asn):
                                             int(t[0].split('/')[1]), t[2])):
             filas.append((ip, prefijo, fmt_path(path), linea))
     return filas
+
+def neighborhood(adj, root, depth=2, max_nodes=60):
+    """Nodes within `depth` hops of root (BFS), capped at max_nodes."""
+    if root not in adj:
+        return set(), []
+    seen = {root}
+    frontier = [root]
+    for _ in range(depth):
+        nxt = []
+        for u in frontier:
+            for v in sorted(adj[u]):
+                if v not in seen and len(seen) < max_nodes:
+                    seen.add(v)
+                    nxt.append(v)
+        frontier = nxt
+    edges = [(a, b) for a in seen for b in adj[a] if b in seen and a < b]
+    return seen, edges
+
+
+def force_layout(nodes, edges, iterations=150):
+    """Fruchterman-Reingold layout. Returns {node: (x, y)} in [0, 1]."""
+    import math
+    import random
+    rnd = random.Random(1)
+    ns = sorted(nodes)
+    pos = {n: [rnd.random(), rnd.random()] for n in ns}
+    k = math.sqrt(1.0 / max(1, len(ns)))
+    temp = 0.1
+    for _ in range(iterations):
+        disp = {n: [0.0, 0.0] for n in ns}
+        for i, a in enumerate(ns):
+            for b in ns[i + 1:]:
+                dx = pos[a][0] - pos[b][0]
+                dy = pos[a][1] - pos[b][1]
+                d = max(math.hypot(dx, dy), 1e-4)
+                f = k * k / d
+                disp[a][0] += dx / d * f
+                disp[a][1] += dy / d * f
+                disp[b][0] -= dx / d * f
+                disp[b][1] -= dy / d * f
+        for a, b in edges:
+            dx = pos[a][0] - pos[b][0]
+            dy = pos[a][1] - pos[b][1]
+            d = max(math.hypot(dx, dy), 1e-4)
+            f = d * d / k
+            disp[a][0] -= dx / d * f
+            disp[a][1] -= dy / d * f
+            disp[b][0] += dx / d * f
+            disp[b][1] += dy / d * f
+        for n in ns:
+            dx, dy = disp[n]
+            d = max(math.hypot(dx, dy), 1e-4)
+            step = min(d, temp)
+            pos[n][0] += dx / d * step
+            pos[n][1] += dy / d * step
+        temp *= 0.97
+    xs = [p[0] for p in pos.values()]
+    ys = [p[1] for p in pos.values()]
+    sx = (max(xs) - min(xs)) or 1.0
+    sy = (max(ys) - min(ys)) or 1.0
+    return {n: ((p[0] - min(xs)) / sx, (p[1] - min(ys)) / sy)
+            for n, p in pos.items()}
