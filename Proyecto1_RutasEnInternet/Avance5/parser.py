@@ -19,6 +19,7 @@ import os
 import sys
 import argparse
 from dataclasses import dataclass, field
+from analysis import Indices
 
 import ply.yacc as yacc
 
@@ -98,6 +99,7 @@ class ParseResult:
     all_as_numbers: set = field(default_factory=set)
     as_graph: ASGraph = field(default_factory=ASGraph)
     colector: Colector = field(default_factory=Colector)
+    index: Indices = field(default_factory=Indices)
     total_lines: int = 0
     # Índices para las funcionalidades 1-3 (se llenan en p_linea)
     index: Indices = field(default_factory=Indices)
@@ -224,6 +226,7 @@ def p_linea(p):
         'line': line,
     }
     _res.records.append(record)                                  # list
+    _res.index.add(prefix_txt, peer_as, peer_ip, as_path, line)
     _res.routing_table.setdefault(prefix_txt, []).append(record)  # dict
     _res.all_as_numbers.update(as_numbers)                       # set
     _res.all_as_numbers.add(peer_as)
