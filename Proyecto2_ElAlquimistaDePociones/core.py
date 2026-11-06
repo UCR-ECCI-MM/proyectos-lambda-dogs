@@ -96,4 +96,15 @@ def generar_instancia(n, semilla=42, frac_capacidad=0.4, frac_umbral=0.6,
 
     return Instancia(ingredientes, capacidad, umbrales, list(alfas), semilla)
 
+# ---------- Guardar / cargar ----------
 
+def guardar_instancia(inst, ruta):
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(asdict(inst), f, ensure_ascii=False, indent=2)
+
+
+def cargar_instancia(ruta):
+    with open(ruta, encoding="utf-8") as f:
+        d = json.load(f)
+    ings = [Ingrediente(**i) for i in d["ingredientes"]]
+    return Instancia(ings, d["capacidad"], d["umbrales"], d["alfas"], d.get("semilla"))
