@@ -62,3 +62,38 @@ def violacion(inst, x):
     tot = props_totales(inst, x)
     v += sum(max(0, u - t) for t, u in zip(tot, inst.umbrales))
     return v
+
+# ---------- Generador de instancias ----------
+
+def generar_instancia(n, semilla=42, frac_capacidad=0.4, frac_umbral=0.6,
+                      alfas=(1.0, 1.0, 1.0)):
+    """
+    Instancia reproducible (misma semilla => mismos datos).
+    Garantiza que exista al menos una solución válida.
+    """
+    rng = random.Random(semilla)
+    ingredientes = []
+    for i in range(n):
+        nombre = f"{NOMBRES[i % len(NOMBRES)]} #{i + 1}"
+        peso = rng.randint(1, 30)
+        props = [rng.randint(1, 50) for _ in range(3)]
+        ingredientes.append(Ingrediente(nombre, peso, props))
+
+    capacidad = int(sum(ing.peso for ing in ingredientes) * frac_capacidad)
+
+    # Receta de referencia aleatoria que cabe en el caldero
+    orden = list(range(n))
+    rng.shuffle(orden)
+    ref, peso_ref = [0] * n, 0
+    for i in orden:
+        if peso_ref + ingredientes[i].peso <= capacidad:
+            ref[i] = 1
+            peso_ref += ingredientes[i].peso
+
+    base = [sum(ingredientes[i].props[k] for i in range(n) if ref[i])
+            for k in range(3)]
+    umbrales = [int(b * frac_umbral) for b in base]
+
+    return Instancia(ingredientes, capacidad, umbrales, list(alfas), semilla)
+
+
