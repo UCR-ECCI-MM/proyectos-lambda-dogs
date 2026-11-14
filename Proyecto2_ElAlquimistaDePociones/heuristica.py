@@ -25,3 +25,61 @@ def heuristica_simple(inst):
             x[i] = 1
             restante -= w
     return x, potencia(inst, x), time.perf_counter() - inicio
+
+def _violacion_de(inst, peso, tot):
+    """Violación calculada a partir del peso y las propiedades ya acumuladas."""
+    v = max(0, peso - inst.capacidad)
+    return v + sum(max(0, u - t) for t, u in zip(tot, inst.umbrales))
+
+
+def reparar(inst, x, max_iter=None):
+    """Paso de reparación: en cada iteración aplica el movimiento (agregar un
+    ingrediente o intercambiar uno dentro por uno fuera) que más reduce el
+    incumplimiento de umbrales sin pasarse del peso. Para cuando la receta es
+    válida o ningún movimiento mejora."""
+    x = x[:]
+    n = inst.n
+    max_iter = max_iter or n
+    peso = peso_total(inst, x)
+    tot = props_totales(inst, x)
+
+    for _ in range(max_iter):
+        v_act = _violacion_de(inst, peso, tot)
+        if v_act == 0:
+            break
+        dentro = [k for k in range(n) if x[k]]
+        fuera = [k for k in range(n) if not x[k]]
+        mejor, mejor_clave = None, None
+        for j in fuera:
+            ing_j = inst.ingredientes[j]
+            for i in [None] + dentro:
+                p = peso + ing_j.peso
+                t = [tot[k] + ing_j.props[k] for k in range(3)]
+                if i is not None:
+                    ing_i = inst.ingredientes[i]
+                    p -= ing_i.peso
+                    t = [t[k] - ing_i.props[k] for k in range(3)]
+                if p > inst.capacidad:
+                    continue
+                v = _violacion_de(inst, p, t)
+                if v >= v_act:
+                    continue
+                z = sum(a * tk for a, tk in zip(inst.alfas, t))
+                clave = (v, -z)  # menor violación; a igualdad, mayor Z
+                if mejor_clave is None or clave < mejor_clave:
+                    mejor_clave, mejor = clave, (i, j, p, t)
+        if mejor is None:
+            break
+        i, j, peso, tot = mejor
+        x[j] = 1
+        if i is not None:
+            x[i] = 0
+    return x
+
+
+def heuristica_reparacion(inst):
+    """Heurística simple + reparación. Devuelve (x, Z, segundos)."""
+    inicio = time.perf_counter()
+    x, _, _ = heuristica_simple(inst)
+    x = reparar(inst, x)
+    return x, potencia(inst, x), time.perf_counter() - inicio
