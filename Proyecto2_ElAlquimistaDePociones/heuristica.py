@@ -83,3 +83,16 @@ def heuristica_reparacion(inst):
     x, _, _ = heuristica_simple(inst)
     x = reparar(inst, x)
     return x, potencia(inst, x), time.perf_counter() - inicio
+
+if __name__ == "__main__":
+    for n in (10, 15, 20, 50):
+        inst = generar_instancia(n, semilla=42)
+        print(f"--- N={n} | W={inst.capacidad} | umbrales={inst.umbrales}")
+        if n <= 16:
+            from fuerza_bruta import fuerza_bruta
+            print(f"{'óptimo (FB)':15s} Z={fuerza_bruta(inst)[1]}")
+        for nombre, f in (("simple", heuristica_simple),
+                          ("con reparación", heuristica_reparacion)):
+            x, z, t = f(inst)
+            print(f"{nombre:15s} Z={z:8.1f} | válida={es_valida(inst, x)} "
+                  f"| {t * 1000:.2f} ms")
