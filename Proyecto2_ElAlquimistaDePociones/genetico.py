@@ -23,3 +23,22 @@ class ParametrosGA:
 def aptitud(inst, x, penalizacion):
     """Z(x) si es válida; si no, Z(x) menos penalización proporcional a la violación."""
     return potencia(inst, x) - penalizacion * violacion(inst, x)
+
+def poblacion_inicial(inst, tam, rng, sembrar=False):
+    """Recetas aleatorias. Cada ingrediente entra con probabilidad W / (suma de pesos),
+    para que las recetas iniciales ronden la capacidad del caldero."""
+    total = sum(ing.peso for ing in inst.ingredientes)
+    p = min(1.0, inst.capacidad / total)
+    pob = [[1 if rng.random() < p else 0 for _ in range(inst.n)]
+           for _ in range(tam)]
+    if sembrar:
+        from heuristica import heuristica_reparacion  # depende del módulo de la heurística
+        pob[0] = heuristica_reparacion(inst)[0]
+    return pob
+
+
+def seleccion_torneo(pob, aptitudes, k, rng):
+    """Toma k individuos al azar y devuelve una copia del de mayor aptitud."""
+    candidatos = rng.sample(range(len(pob)), min(k, len(pob)))
+    mejor = max(candidatos, key=lambda i: aptitudes[i])
+    return pob[mejor][:]
