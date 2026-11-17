@@ -42,3 +42,26 @@ def seleccion_torneo(pob, aptitudes, k, rng):
     candidatos = rng.sample(range(len(pob)), min(k, len(pob)))
     mejor = max(candidatos, key=lambda i: aptitudes[i])
     return pob[mejor][:]
+
+def cruce(p1, p2, pc, rng):
+    """Cruce de un punto con probabilidad pc. Devuelve dos hijos."""
+    n = len(p1)
+    if n > 1 and rng.random() < pc:
+        corte = rng.randint(1, n - 1)
+        return p1[:corte] + p2[corte:], p2[:corte] + p1[corte:]
+    return p1[:], p2[:]
+
+
+def mutacion(x, pm, rng, p_swap=0.1):
+    """Inclusión/exclusión de cada gen con probabilidad pm; además, con
+    probabilidad p_swap intercambia un ingrediente dentro por uno fuera."""
+    for i in range(len(x)):
+        if rng.random() < pm:
+            x[i] ^= 1
+    if rng.random() < p_swap:
+        dentro = [i for i, v in enumerate(x) if v]
+        fuera = [i for i, v in enumerate(x) if not v]
+        if dentro and fuera:
+            x[rng.choice(dentro)] = 0
+            x[rng.choice(fuera)] = 1
+    return x
