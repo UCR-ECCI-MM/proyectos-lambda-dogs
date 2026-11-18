@@ -65,3 +65,47 @@ def mutacion(x, pm, rng, p_swap=0.1):
             x[rng.choice(dentro)] = 0
             x[rng.choice(fuera)] = 1
     return x
+
+def algoritmo_genetico(inst, params=None, semilla=None):
+    """Devuelve (mejor_x, mejor_Z, segundos, historial).
+    mejor_x es la mejor receta VÁLIDA encontrada (None si nunca hubo una).
+    historial[g] = mejor Z válido hasta la generación g (None si aún no hay)."""
+    params = params or ParametrosGA()
+    rng = random.Random(semilla)
+    pm = params.pm if params.pm is not None else 1.0 / inst.n
+    inicio = time.perf_counter()
+
+    pob = poblacion_inicial(inst, params.tam_poblacion, rng,
+                            params.sembrar_heuristica)
+    mejor_x, mejor_z = None, None
+    historial = []
+    sin_mejora = 0
+
+    for gen in range(params.generaciones + 1):
+        aptitudes = [aptitud(inst, x, params.penalizacion) for x in pob]
+
+        mejoro = False
+        for x in pob:
+            if es_valida(inst, x):
+                z = potencia(inst, x)
+                if mejor_z is None or z > mejor_z:
+                    mejor_x, mejor_z, mejoro = x[:], z, True
+        historial.append(mejor_z)
+        sin_mejora = 0 if mejoro else sin_mejora + 1
+
+        if gen == params.generaciones or sin_mejora >= params.paciencia:
+            break
+
+        # Elitismo + reproducción
+        orden = sorted(range(len(pob)), key=lambda i: aptitudes[i], reverse=True)
+        nueva = [pob[i][:] for i in orden[:params.elitismo]]
+        while len(nueva) < params.tam_poblacion:
+            p1 = seleccion_torneo(pob, aptitudes, params.tam_torneo, rng)
+            p2 = seleccion_torneo(pob, aptitudes, params.tam_torneo, rng)
+            h1, h2 = cruce(p1, p2, params.pc, rng)
+            nueva.append(mutacion(h1, pm, rng))
+            if len(nueva) < params.tam_poblacion:
+                nueva.append(mutacion(h2, pm, rng))
+        pob = nueva
+
+    return mejor_x, mejor_z, time.perf_counter() - inicio, historial
