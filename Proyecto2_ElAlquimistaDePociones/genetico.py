@@ -109,3 +109,13 @@ def algoritmo_genetico(inst, params=None, semilla=None):
         pob = nueva
 
     return mejor_x, mejor_z, time.perf_counter() - inicio, historial
+
+if __name__ == "__main__":
+    from fuerza_bruta import fuerza_bruta
+    inst = generar_instancia(16, semilla=42)
+    _, z_opt, t_fb = fuerza_bruta(inst)
+    print(f"Óptimo (fuerza bruta): Z={z_opt} ({t_fb:.2f} s)")
+    for s in range(5):
+        x, z, t, _ = algoritmo_genetico(inst, semilla=s)
+        brecha = (z_opt - z) / z_opt * 100 if z is not None else float("nan")
+        print(f"semilla {s}: Z={z} | brecha={brecha:.2f}% | {t:.2f} s")
