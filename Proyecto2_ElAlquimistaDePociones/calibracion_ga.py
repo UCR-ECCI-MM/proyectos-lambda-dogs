@@ -10,7 +10,7 @@ from dataclasses import replace
 from statistics import mean
 
 from core import generar_instancia
-from fuerza_bruta import fuerza_bruta
+from fuerzabruta import fuerzabruta
 from genetico import algoritmo_genetico, ParametrosGA
 
 N = 22
@@ -67,7 +67,7 @@ def mostrar_top(filas, claves, k=5):
 
 if __name__ == "__main__":
     inst = generar_instancia(N, SEMILLA_INSTANCIA, **INST_KW)
-    _, z_ref, t_fb = fuerza_bruta(inst)
+    _, z_ref, t_fb = fuerzabruta(inst)
     print(f"Instancia N={N}, óptimo (FB) Z={z_ref} ({t_fb:.1f} s)")
 
     # ---- Fase 1 ----
