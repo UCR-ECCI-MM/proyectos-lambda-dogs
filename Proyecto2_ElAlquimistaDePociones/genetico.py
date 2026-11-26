@@ -111,8 +111,8 @@ def algoritmo_genetico(inst, params=None, semilla=None):
     return mejor_x, mejor_z, time.perf_counter() - inicio, historial
 
 if __name__ == "__main__":
-    from fuerza_bruta import fuerza_bruta
-    inst = generar_instancia(16, semilla=42)
+    from fuerzabruta import fuerzabruta as fuerza_bruta
+    inst = generar_instancia(16, semilla=42, frac_umbral=1.0, alfas=(1.0, 0.2, 0.2))
     _, z_opt, t_fb = fuerza_bruta(inst)
     print(f"Óptimo (fuerza bruta): Z={z_opt} ({t_fb:.2f} s)")
     for s in range(5):

@@ -86,10 +86,10 @@ def heuristica_reparacion(inst):
 
 if __name__ == "__main__":
     for n in (10, 15, 20, 50):
-        inst = generar_instancia(n, semilla=42)
+        inst = generar_instancia(n, semilla=42, frac_umbral=1.0, alfas=(1.0, 0.2, 0.2))
         print(f"--- N={n} | W={inst.capacidad} | umbrales={inst.umbrales}")
         if n <= 16:
-            from fuerza_bruta import fuerza_bruta
+            from fuerzabruta import fuerzabruta as fuerza_bruta
             print(f"{'óptimo (FB)':15s} Z={fuerza_bruta(inst)[1]}")
         for nombre, f in (("simple", heuristica_simple),
                           ("con reparación", heuristica_reparacion)):

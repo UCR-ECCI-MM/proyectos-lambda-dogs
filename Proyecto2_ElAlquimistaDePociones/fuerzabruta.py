@@ -21,9 +21,9 @@ def fuerzabruta(inst):
 
 if __name__ == "__main__":
     # Tiempo vs. N (se detiene si una corrida pasa de 60 s)
-    for n in range(8, 26):
-        inst = generar_instancia(n, semilla=42)
-        x, z, t = fuerza_bruta(inst)
+    for n in range(8, 21):
+        inst = generar_instancia(n, semilla=42, frac_umbral=1.0, alfas=(1.0, 0.2, 0.2))
+        x, z, t = fuerzabruta(inst)
         print(f"N={n:2d} | Z={z} | {t:.3f} s")
         if t > 60:
             print("Límite práctico alcanzado")
